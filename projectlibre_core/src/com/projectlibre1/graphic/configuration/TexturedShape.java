@@ -228,15 +228,13 @@ public class TexturedShape {
 
 	protected void applyPaint(Graphics2D g2, boolean texture) {
 		// if ("SVGGraphics2D".equals(g2.getClass().getSimpleName()))
-		if (texture)
+		if (paint instanceof PredefinedPaint) {
+			//lets solid patterns render as plain colors instead of slow texture fills
+			((PredefinedPaint) paint).applyPaint(g2, texture);
+		} else if (texture)
 			g2.setPaint(paint); // the paint already has the color set
-		else {
-			if (paint instanceof PredefinedPaint) {
-				PredefinedPaint p = (PredefinedPaint) paint;
-				p.applyPaint(g2, texture);
-			} else
-				g2.setColor(getColor());
-		}
+		else
+			g2.setColor(getColor());
 
 	}
 

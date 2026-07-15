@@ -72,6 +72,7 @@ public class PredefinedPaint extends TexturePaint {
 	private int height;
 	private int[] points;
 	private float alphaValue=1.0f;
+	private boolean solid=false;
 
 
 	public PredefinedPaint(int width, int height, int[] array) {
@@ -85,25 +86,36 @@ public class PredefinedPaint extends TexturePaint {
 	private PredefinedPaint(int width, int height, int[] points, Color foreground,
 			Color background) {
 		super(createTexture(width, height, points, foreground, background),
-				new Rectangle(0, 0, width, height));
+				new Rectangle(0, 0, width*tileFactor(width), height*tileFactor(height)));
 		this.width = width;
 		this.height = height;
 		this.foreground = foreground;
 		this.background = background;
 		this.points = points;
 		float sum=0;
+		boolean allOn=true;
 		for (int i=0; i<points.length;i++){
 			sum+=points[i];
+			if (points[i]<=0) allOn=false;
 		}
+		solid=allOn;
 		alphaValue = (float) Math.pow(sum/points.length,1.5); //modify brightness
+	}
+
+	//tiling tiny (e.g. 4x4) textures over large areas is very slow; repeat the
+	//pattern up to >=64px per side so fills need far fewer tile iterations
+	private static int tileFactor(int size) {
+		return Math.max(1, 64/size);
 	}
 
 	private static BufferedImage createTexture(int width, int height,
 			int[] array, Color foreground, Color background) {
-		BufferedImage bufferedImage = new BufferedImage(width, height,BufferedImage.TYPE_INT_ARGB);
-		for (int w = 0; w < width; w++) {
-			for (int h = 0; h < height; h++) {
-				bufferedImage.setRGB(w, h, array[w + h * width] > 0 ? foreground.getRGB() : background.getRGB());
+		int tiledWidth=width*tileFactor(width);
+		int tiledHeight=height*tileFactor(height);
+		BufferedImage bufferedImage = new BufferedImage(tiledWidth, tiledHeight,BufferedImage.TYPE_INT_ARGB);
+		for (int w = 0; w < tiledWidth; w++) {
+			for (int h = 0; h < tiledHeight; h++) {
+				bufferedImage.setRGB(w, h, array[(w%width) + (h%height) * width] > 0 ? foreground.getRGB() : background.getRGB());
 			}
 		}
 		return bufferedImage;
@@ -168,12 +180,14 @@ public class PredefinedPaint extends TexturePaint {
 
 	public void applyPaint(Graphics2D g2,boolean texture){
 		//if ("SVGGraphics2D".equals(g2.getClass().getSimpleName()))
-		if (texture) {
+		if (solid) {
+			g2.setColor(foreground); // a solid pattern renders as the plain color; skip the much slower texture fill
+		} else if (texture) {
 			g2.setPaint(this); // the paint already has the color set
 		} else {
 			g2.setColor(new Color(bar(foreground.getRed(),background.getRed(),alphaValue),bar(foreground.getGreen(),background.getGreen(),alphaValue),bar(foreground.getBlue(),background.getBlue(),alphaValue)));
 		}
-		
+
 	}
 	private int bar(float a,float b,float w){
 		return Math.round(a*w+(1.0f-w)*b);
