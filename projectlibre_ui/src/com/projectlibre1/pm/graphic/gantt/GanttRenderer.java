@@ -72,8 +72,11 @@ import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.ListIterator;
+import java.util.Set;
 
 import javax.swing.CellRendererPane;
 import javax.swing.JComponent;
@@ -491,6 +494,29 @@ public class GanttRenderer extends GraphRenderer implements Serializable {
 				if (!node.isVoid()) updateShape(node);
 			}
 		}
+    }
+
+    public void updateShapes(List nodes){
+    	//the indexes of an update event's node list don't match cache rows: walk the cache so rows stay correct
+    	if (nodes==null){
+    		updateShapes();
+    		return;
+    	}
+    	CoordinatesConverter coord=((GanttParams)graphInfo).getCoord();
+    	if (coord==null) return;
+    	Rectangle bounds = ((GanttParams)graphInfo).getGanttBounds();
+    	double rowHeight=((GanttParams)graphInfo).getRowHeight();
+    	int i0=(int)Math.floor(bounds.getY()/rowHeight);
+    	int i1=(int)Math.ceil(bounds.getMaxY()/rowHeight);
+    	Set changed=new HashSet(nodes);
+    	GraphicNode node;
+    	for (ListIterator i=graphInfo.getCache().getIterator();i.hasNext();){
+    		node=(GraphicNode)i.next();
+    		node.setRow(i.previousIndex());
+    		if (i.previousIndex()>=i0&&i.previousIndex()<i1&&changed.contains(node)){
+    			if (!node.isVoid()) updateShape(node);
+    		}
+    	}
     }
 
     public void updateShape(GraphicNode node){
