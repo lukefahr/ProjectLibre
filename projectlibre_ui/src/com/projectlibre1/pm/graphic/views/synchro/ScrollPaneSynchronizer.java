@@ -132,11 +132,16 @@ public class ScrollPaneSynchronizer {
 						.getVerticalScrollBarPolicy();
 				scrollPane1.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
 				scrollPane2.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
+				//a zero-width but visible scrollbar keeps mouse wheel scrolling vertical:
+				//with VERTICAL_SCROLLBAR_NEVER the wheel handler falls back to horizontal scrolling
 				scrollPane1
-						.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+						.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+				scrollPane1.getVerticalScrollBar().setPreferredSize(new Dimension(0,0));
 				scrollPane2
 						.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
 
+				//no revalidate() here: setViewPosition repaints via blit on its own, and a
+				//layout pass per scroll tick makes scrolling choppy
 				scrollPane1.getViewport().addChangeListener(new ChangeListener() {
 					public void stateChanged(ChangeEvent e) {
 						JViewport vp1 = scrollPane1.getViewport();
@@ -145,7 +150,6 @@ public class ScrollPaneSynchronizer {
 						Point p2 = vp2.getViewPosition();
 						p2.setLocation((int) p2.getX(), (int) p1.getY());
 						vp2.setViewPosition(p2);
-						vp2.revalidate();
 					}
 				});
 
@@ -157,7 +161,6 @@ public class ScrollPaneSynchronizer {
 						Point p2 = vp2.getViewPosition();
 						p1.setLocation((int) p1.getX(), (int) p2.getY());
 						vp1.setViewPosition(p1);
-						vp1.revalidate();
 					}
 				});
 
@@ -204,6 +207,7 @@ public class ScrollPaneSynchronizer {
 			scrollPane2.getViewport().removeChangeListener(listener);
 			if (orientation == HORIZONTAL) {
 				scrollPane1.setVerticalScrollBarPolicy(defaultScrollBarPolicy1);
+				scrollPane1.getVerticalScrollBar().setPreferredSize(null);
 				scrollPane2.setVerticalScrollBarPolicy(defaultScrollBarPolicy2);
 			} else if (orientation == VERTICAL) {
 				scrollPane1
