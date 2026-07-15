@@ -212,6 +212,21 @@ public abstract class NetworkRenderer extends GraphRenderer{
 		barStyles.apply(dependency,linkRenderer,true,false,false, false);
 	}
 
+	protected Rectangle getLinkBounds(GraphicDependency dependency){
+		GraphicNode predecessor=dependency.getPredecessor();
+		GraphicNode successor=dependency.getSuccessor();
+		if (predecessor==null||successor==null) return null;
+		Rectangle predecessorBounds=getBounds(predecessor);
+		Rectangle successorBounds=getBounds(successor);
+		if (predecessorBounds==null||successorBounds==null) return null;
+		Rectangle union=predecessorBounds.union(successorBounds);
+		//routing can loop around a node when the successor is behind the predecessor
+		int margin=Math.max(Math.max(predecessorBounds.width,successorBounds.width),
+				Math.max(predecessorBounds.height,successorBounds.height));
+		union.grow(margin,margin);
+		return union;
+	}
+
 	
 	
 	protected GeneralPath getShape(GraphicNode node){
@@ -313,6 +328,8 @@ public abstract class NetworkRenderer extends GraphRenderer{
 			GraphicDependency dependency;
 			for (Iterator i=getDependenciesIterator();i.hasNext();){
 				dependency=(GraphicDependency)i.next();
+				Rectangle linkBounds=getLinkBounds(dependency);
+				if (linkBounds!=null&&!clipBounds.intersects(linkBounds)) continue;
 				paintLink(g2,dependency);
 			}
 			

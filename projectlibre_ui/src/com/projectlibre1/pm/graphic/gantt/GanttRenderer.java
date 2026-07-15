@@ -690,8 +690,15 @@ public class GanttRenderer extends GraphRenderer implements Serializable {
 		GraphicDependency dependency;
 		for (Iterator i=cache.getEdgesIterator();i.hasNext();){
 			dependency=(GraphicDependency)i.next();
-			//if (nodeList.contains(dependency.getPredecessor())||nodeList.contains(dependency.getSuccessor()))
-				paintLink(g2,dependency);
+			GraphicNode predecessor=dependency.getPredecessor();
+			GraphicNode successor=dependency.getSuccessor();
+			if (predecessor!=null&&successor!=null){
+				//links are routed between their end rows; skip those entirely outside the repainted rows (1 row margin for arrows)
+				int rowMin=Math.min(predecessor.getRow(),successor.getRow());
+				int rowMax=Math.max(predecessor.getRow(),successor.getRow());
+				if (rowMax<i0-1||rowMin>i1) continue;
+			}
+			paintLink(g2,dependency);
 		}
 
 		for (ListIterator i=nodeList.listIterator();i.hasNext();){
