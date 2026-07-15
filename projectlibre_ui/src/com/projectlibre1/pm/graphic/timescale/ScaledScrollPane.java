@@ -58,6 +58,7 @@ package com.projectlibre1.pm.graphic.timescale;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
+import java.awt.event.MouseWheelEvent;
 
 import javax.swing.JComponent;
 import javax.swing.JPanel;
@@ -101,6 +102,24 @@ public class ScaledScrollPane extends JScrollPane implements TimeScaleListener, 
 		this.getVerticalScrollBar().setUnitIncrement(verticalIncrement);
 		this.getHorizontalScrollBar().setUnitIncrement(coord.getTimescaleManager().getMinWidth());
 		
+	}
+
+	/**
+	 * Ctrl (or Cmd) + mouse wheel zooms the timescale in/out; a plain wheel scrolls as usual.
+	 * Overriding here (instead of adding a listener) lets a zoom gesture consume the event so it
+	 * never also scrolls the pane.
+	 */
+	protected void processMouseWheelEvent(MouseWheelEvent e) {
+		if (coord != null && (e.isControlDown() || e.isMetaDown())) {
+			int rotation = e.getWheelRotation();
+			if (rotation < 0)
+				coord.zoomIn();
+			else if (rotation > 0)
+				coord.zoomOut();
+			e.consume();
+			return;
+		}
+		super.processMouseWheelEvent(e);
 	}
 
 	public void createLayout(){
