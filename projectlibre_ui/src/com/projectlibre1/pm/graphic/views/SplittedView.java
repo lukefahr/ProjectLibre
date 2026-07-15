@@ -83,6 +83,9 @@ public abstract class SplittedView extends JSplitPane {
 		super(JSplitPane.HORIZONTAL_SPLIT);
 		this.synchronizer = synchronizer;
 		setOneTouchExpandable(true);
+		//relayout the panes live while dragging the divider. Without this the split pane
+		//paints a divider outline during the drag and leaves that dark band behind on release.
+		setContinuousLayout(true);
 	}
 	public void cleanUp() {
 		leftScrollPane = null;
