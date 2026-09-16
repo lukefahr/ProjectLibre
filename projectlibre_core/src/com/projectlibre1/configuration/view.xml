@@ -460,6 +460,7 @@
 		<columns>
 			<column>Field.id</column>
 			<column>Field.name</column>
+			<column>Field.outlineLevel</column>
 			<column>Field.bcws</column>
 			<column>Field.bcwp</column>
 			<column>Field.sv</column>
@@ -975,7 +976,7 @@
 	<views>
 		<view id="View.Gantt">
 			<transform
-				filters="Filter.None,Filter.MyTasks,Filter.DateRange,Filter.CompletedTasks,Filter.CostOverbudgetTasks,Filter.CriticalTasks,Filter.InProgressTasks,Filter.IncompleteTasks,Filter.LateOrOverbudgetTasks,Filter.NormalTasks,Filter.Milestones,Filter.SlippedTasks,Filter.SummaryTasks,Filter.Flag1,Filter.Flag2,Filter.Flag3,Filter.TasksWithEstimatedDurations,Filter.UnstartedTasks,Filter.StartingWithinWeek,Filter.StartingWithinTwoWeeks"
+				filters="Filter.None,Filter.MyTasks,Filter.DateRange,Filter.CompletedTasks,Filter.CostOverbudgetTasks,Filter.CriticalTasks,Filter.InProgressTasks,Filter.IncompleteTasks,Filter.LateOrOverbudgetTasks,Filter.NormalTasks,Filter.Milestones,Filter.SlippedTasks,Filter.SummaryTasks,Filter.OutlineLevel1,Filter.OutlineLevel2,Filter.OutlineLevel3,Filter.Flag1,Filter.Flag2,Filter.Flag3,Filter.TasksWithEstimatedDurations,Filter.UnstartedTasks,Filter.StartingWithinWeek,Filter.StartingWithinTwoWeeks"
 				sorters="Sorter.None,Sorter.Name,Sorter.DurationThenCost,Sorter.StartDate,Sorter.FinishDate,Sorter.Duration,Sorter.Cost,Sorter.CostOverbudget,Sorter.CompleteIncomplete,Sorter.Critical,Field.priority"
 				groupers="Grouper.None,Grouper.CriticalThenDuration,Grouper.CompleteIncomplete,Grouper.Critical,Grouper.Duration,Grouper.ResourceNames"
 				>
@@ -984,7 +985,7 @@
 		</view>
 		<view id="View.OfflineGantt">
 			<transform
-				filters="Filter.None,Filter.MyTasks,Filter.DateRange,Filter.CompletedTasks,Filter.CostOverbudgetTasks,Filter.CriticalTasks,Filter.InProgressTasks,Filter.IncompleteTasks,Filter.LateOrOverbudgetTasks,Filter.NormalTasks,Filter.Milestones,Filter.SlippedTasks,Filter.SummaryTasks,Filter.Flag1,Filter.Flag2,Filter.Flag3,Filter.TasksWithEstimatedDurations,Filter.UnstartedTasks"
+				filters="Filter.None,Filter.MyTasks,Filter.DateRange,Filter.CompletedTasks,Filter.CostOverbudgetTasks,Filter.CriticalTasks,Filter.InProgressTasks,Filter.IncompleteTasks,Filter.LateOrOverbudgetTasks,Filter.NormalTasks,Filter.Milestones,Filter.SlippedTasks,Filter.SummaryTasks,Filter.OutlineLevel1,Filter.OutlineLevel2,Filter.OutlineLevel3,Filter.Flag1,Filter.Flag2,Filter.Flag3,Filter.TasksWithEstimatedDurations,Filter.UnstartedTasks"
 				sorters="Sorter.None,Sorter.Name,Sorter.DurationThenCost,Sorter.StartDate,Sorter.FinishDate,Sorter.Duration,Sorter.Cost,Sorter.CostOverbudget,Sorter.CompleteIncomplete,Sorter.Critical,Field.priority"
 				groupers="Grouper.None,Grouper.CriticalThenDuration,Grouper.CompleteIncomplete,Grouper.Critical,Grouper.Duration,Grouper.ResourceNames"
 				>
@@ -1037,7 +1038,7 @@
 		</view>
 		<view id="View.Network">
 			<transform
-				filters="Filter.None,Filter.MyTasks,Filter.CompletedTasks,Filter.CostOverbudgetTasks,Filter.CriticalTasks,Filter.InProgressTasks,Filter.IncompleteTasks,Filter.LateOrOverbudgetTasks,Filter.NormalTasksOrMilestones,Filter.Milestones,Filter.SlippedTasks,Filter.SummaryTasks,Filter.Flag1,Filter.Flag2,Filter.Flag3,Filter.TasksWithEstimatedDurations,Filter.UnstartedTasks,Filter.StartingWithinWeek,Filter.StartingWithinTwoWeeks"
+				filters="Filter.None,Filter.MyTasks,Filter.CompletedTasks,Filter.CostOverbudgetTasks,Filter.CriticalTasks,Filter.InProgressTasks,Filter.IncompleteTasks,Filter.LateOrOverbudgetTasks,Filter.NormalTasksOrMilestones,Filter.Milestones,Filter.SlippedTasks,Filter.SummaryTasks,Filter.OutlineLevel1,Filter.OutlineLevel2,Filter.OutlineLevel3,Filter.Flag1,Filter.Flag2,Filter.Flag3,Filter.TasksWithEstimatedDurations,Filter.UnstartedTasks,Filter.StartingWithinWeek,Filter.StartingWithinTwoWeeks"
 				sorters="Sorter.None,Sorter.Name,Sorter.DurationThenCost,Sorter.StartDate,Sorter.FinishDate,Sorter.Duration,Sorter.Cost,Sorter.CostOverbudget,Sorter.CompleteIncomplete,Sorter.Critical,Field.priority"
 				groupers="Grouper.None"
 				>
@@ -1064,7 +1065,7 @@
 		</view>
 		<view id="View.TaskUsageDetail">
 			<transform
-				filters="Filter.None,Filter.,Filter.MyTasks,CompletedTasks,Filter.CostOverbudgetTasks,Filter.CriticalTasks,Filter.InProgressTasks,Filter.IncompleteTasks,Filter.LateOrOverbudgetTasks,Filter.NormalTasks,Filter.Milestones,Filter.SlippedTasks,Filter.SummaryTasks,Filter.Flag1,Filter.Flag2,Filter.Flag3,Filter.TasksWithEstimatedDurations,Filter.UnstartedTasks,Filter.StartingWithinWeek,Filter.StartingWithinTwoWeeks"
+				filters="Filter.None,Filter.,Filter.MyTasks,CompletedTasks,Filter.CostOverbudgetTasks,Filter.CriticalTasks,Filter.InProgressTasks,Filter.IncompleteTasks,Filter.LateOrOverbudgetTasks,Filter.NormalTasks,Filter.Milestones,Filter.SlippedTasks,Filter.SummaryTasks,Filter.OutlineLevel1,Filter.OutlineLevel2,Filter.OutlineLevel3,Filter.Flag1,Filter.Flag2,Filter.Flag3,Filter.TasksWithEstimatedDurations,Filter.UnstartedTasks,Filter.StartingWithinWeek,Filter.StartingWithinTwoWeeks"
 				sorters="Sorter.None,Sorter.Name,Sorter.DurationThenCost,Sorter.StartDate,Sorter.FinishDate,Sorter.Duration,Sorter.Cost,Sorter.CostOverbudget,Sorter.CompleteIncomplete,Sorter.Critical,Field.priority"
 				groupers="Grouper.None,Grouper.CriticalThenDuration,Grouper.CompleteIncomplete,Grouper.Critical,Grouper.Duration"
 				>
@@ -1129,7 +1130,7 @@
 		</view>
 		<view id="View.TaskReport">
 			<transform
-				filters="Filter.None,Filter.MyTasks,Filter.DateRange,Filter.CompletedTasks,Filter.CostOverbudgetTasks,Filter.CriticalTasks,Filter.InProgressTasks,Filter.IncompleteTasks,Filter.LateOrOverbudgetTasks,Filter.NormalTasks,Filter.Milestones,Filter.SlippedTasks,Filter.SummaryTasks,Filter.Flag1,Filter.Flag2,Filter.Flag3,Filter.TasksWithEstimatedDurations,Filter.UnstartedTasks"
+				filters="Filter.None,Filter.MyTasks,Filter.DateRange,Filter.CompletedTasks,Filter.CostOverbudgetTasks,Filter.CriticalTasks,Filter.InProgressTasks,Filter.IncompleteTasks,Filter.LateOrOverbudgetTasks,Filter.NormalTasks,Filter.Milestones,Filter.SlippedTasks,Filter.SummaryTasks,Filter.OutlineLevel1,Filter.OutlineLevel2,Filter.OutlineLevel3,Filter.Flag1,Filter.Flag2,Filter.Flag3,Filter.TasksWithEstimatedDurations,Filter.UnstartedTasks"
 				sorters="Sorter.None,Sorter.Name,Sorter.DurationThenCost,Sorter.StartDate,Sorter.FinishDate,Sorter.Duration,Sorter.Cost,Sorter.CostOverbudget,Sorter.CompleteIncomplete,Sorter.Critical"
 				groupers="Grouper.None,Grouper.CriticalThenDuration,Grouper.CompleteIncomplete,Grouper.Critical,Grouper.Duration"
 				>
@@ -1325,6 +1326,35 @@
 				</formulaText>
 				<param id="TransformParameter.StartDate"/>
 				<param id="TransformParameter.FinishDate"/>
+			</filter>
+			<!-- Outline level filters. preserveHierarchy="false" is required: while it is on,
+			     NodeCacheTransformer keeps every summary row that fails a filter (so the tree path
+			     to matching leaves survives) and only drops leaves, so a level test would appear to
+			     do nothing to summaries. With it off, any row failing the test is dropped and the
+			     result is exactly the levels asked for. Note this also flattens the rows: keeping
+			     the hierarchy is not an option here, because filterEmptySummaries() drops any
+			     summary left without visible children, which would remove matching summaries whose
+			     own children sit below the cut. -->
+			<filter id="Filter.OutlineLevel1" type="task" preserveHierarchy="false" showEmptySummaries="false">
+				<formulaText>
+					<![CDATA[
+						return task.outlineLevel<=1;
+					]]>
+				</formulaText>
+			</filter>
+			<filter id="Filter.OutlineLevel2" type="task" preserveHierarchy="false" showEmptySummaries="false">
+				<formulaText>
+					<![CDATA[
+						return task.outlineLevel<=2;
+					]]>
+				</formulaText>
+			</filter>
+			<filter id="Filter.OutlineLevel3" type="task" preserveHierarchy="false" showEmptySummaries="false">
+				<formulaText>
+					<![CDATA[
+						return task.outlineLevel<=3;
+					]]>
+				</formulaText>
 			</filter>
 			<filter id="Filter.MyTasks" type="task" showEmptySummaries="false" server="true">
 				<formulaText>

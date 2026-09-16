@@ -1884,7 +1884,8 @@ public abstract class Task implements HasKey, HasNotes, HasCalendar, HasDependen
 		if (model == null)
 			return 0;
 		Node node = model.getParent(model.search(this));
-		return model.getHierarchy().getLevel(node);
+		//getLevel() is 0 based on the parent node; outline levels start at 1, as the MSPDI export assumes
+		return model.getHierarchy().getLevel(node) + 1;
 	}
 	public int getOutlineLevel() {
 		return getOutlineLevel(OutlineCollection.DEFAULT_OUTLINE);

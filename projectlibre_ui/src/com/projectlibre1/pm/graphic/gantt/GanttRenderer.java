@@ -81,6 +81,7 @@ import java.util.Set;
 import javax.swing.CellRendererPane;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.UIManager;
 
 import org.apache.commons.collections.Closure;
 
@@ -397,9 +398,11 @@ public class GanttRenderer extends GraphRenderer implements Serializable {
 		protected BarFormat format;
 		protected GraphicDependency dependency;
 		protected Graphics2D g2;
+		protected boolean criticalLink=false; //evaluated once per link, reused by the arrow heads
 		void initialize(Graphics2D g2, GraphicDependency dependency) {
 			this.g2 = g2;
 			this.dependency = dependency;
+			this.criticalLink = isCriticalLink(dependency);
 		}
 
 
@@ -441,6 +444,7 @@ public class GanttRenderer extends GraphRenderer implements Serializable {
 				Dependency dep = dependency.getDependency();
 				if (dep.isDisabled()) g2.setStroke(DISABLED_LINK_STROKE);
 				if (dep.isCrossProject()) g2.setColor(/*dep.isDirty()?Color.ORANGE:*/EXTERNAL_LINK_COLOR);
+				else if (criticalLink) g2.setColor(CRITICAL_LINK_COLOR);
 				else g2.setColor(/*dep.isDirty()?Color.RED:*/format.getMiddle().getColor());
 				g2.draw(path);
 
@@ -463,12 +467,16 @@ public class GanttRenderer extends GraphRenderer implements Serializable {
 
 		private void drawLinkArrows(Dependency dep, AffineTransform transform, TexturedShape shape) {
 			Color oldEndColor = format.getEnd().getColor();
+			boolean recolored=true;
 			if (dep.isCrossProject())
 				shape.setPaint(EXTERNAL_LINK_COLOR);
+			else if (criticalLink)
+				shape.setPaint(CRITICAL_LINK_COLOR); //keep the arrow head in step with the link
+			else recolored=false;
 			g2.setColor(shape.getColor());
 			LinkRouting routing=((GanttParams)graphInfo).getRouting();
 			shape.draw(g2,routing.getLastX(),routing.getLastY(),transform,useTextures());
-			if (dep.isCrossProject())
+			if (recolored)
 				shape.setPaint(oldEndColor);
 		}
 	}
@@ -622,10 +630,12 @@ public class GanttRenderer extends GraphRenderer implements Serializable {
 //				g2.drawLine(startX,bounds.y,startX,bounds.y+bounds.height);
 //			}
 
+			updateLinePaints(g2.getBackground());
+
 			//project start
 			int projectStartX=(int)Math.round(coord.toX(project.getStart()));
 			if (projectStartX>=bounds.getX()&&projectStartX<=bounds.getMaxX()){
-				g2.setPaint(new PredefinedPaint(PredefinedPaint.DASH_LINE,Color.GRAY,g2.getBackground()));
+				g2.setPaint(projectStartPaint);
 				g2.drawLine(projectStartX,bounds.y,projectStartX,bounds.y+bounds.height);
 			}
 
@@ -634,9 +644,16 @@ public class GanttRenderer extends GraphRenderer implements Serializable {
 			if (statusDate != 0) {
 				int statusDateX=(int)Math.round(coord.toX(statusDate));
 				if (statusDateX>=bounds.getX()&&statusDateX<=bounds.getMaxX()){
-					g2.setPaint(new PredefinedPaint(PredefinedPaint.DOT_LINE2,Color.GREEN,g2.getBackground()));
+					g2.setPaint(statusDatePaint);
 					g2.drawLine(statusDateX,bounds.y,statusDateX,bounds.y+bounds.height);
 				}
+			}
+
+			//today
+			int todayX=(int)Math.round(coord.toX(System.currentTimeMillis()));
+			if (todayX>=bounds.getX()&&todayX<=bounds.getMaxX()){
+				g2.setPaint(todayPaint);
+				g2.drawLine(todayX,bounds.y,todayX,bounds.y+bounds.height);
 			}
 
 
@@ -644,6 +661,23 @@ public class GanttRenderer extends GraphRenderer implements Serializable {
 			if (oldPaint!=null) g2.setPaint(oldPaint);
 
 		}
+	}
+
+	/** Colour of the vertical line marking the current date. */
+	public static Color TODAY_LINE_COLOR = new Color(0,90,200);
+	private PredefinedPaint projectStartPaint=null,statusDatePaint=null,todayPaint=null;
+	private Color linePaintBackground=null;
+
+	/**
+	 * Builds the vertical marker line paints once per background colour. Each PredefinedPaint
+	 * builds a texture image on construction, so creating them per repaint is expensive.
+	 */
+	private void updateLinePaints(Color background){
+		if (projectStartPaint!=null&&(background==null?linePaintBackground==null:background.equals(linePaintBackground))) return;
+		linePaintBackground=background;
+		projectStartPaint=new PredefinedPaint(PredefinedPaint.DASH_LINE,Color.GRAY,background);
+		statusDatePaint=new PredefinedPaint(PredefinedPaint.DOT_LINE2,Color.GREEN,background);
+		todayPaint=new PredefinedPaint(PredefinedPaint.DASH_LINE,TODAY_LINE_COLOR,background);
 	}
 
 	private void drawNonWorking(Graphics2D g2,long startNonworking,long endNonWorking, Calendar cal,CoordinatesConverter coord, Rectangle bounds,boolean userScale2){
@@ -700,11 +734,26 @@ public class GanttRenderer extends GraphRenderer implements Serializable {
 //			paintNode(g2,node,true);
 //		} //Because row not initialized for some nodes
 
+		//mirror the spreadsheet selection: a translucent band under the bars of selected rows
+		Set selectedNodes=(visibleBounds==null)?((GanttParams)graphInfo).getSelectedNodes():null;
+		Color highlightColor=null;
+		if (selectedNodes!=null){
+			Color selectionColor=UIManager.getColor("Table.selectionBackground"); //$NON-NLS-1$
+			if (selectionColor==null) selectionColor=new Color(51,102,204);
+			highlightColor=new Color(selectionColor.getRed(),selectionColor.getGreen(),selectionColor.getBlue(),45);
+		}
+
 		NodeModelCache cache=graphInfo.getCache();
 		for (ListIterator i=cache.getIterator();i.hasNext();){
 			node=(GraphicNode)i.next();
 			node.setRow(i.previousIndex());
 			if (i.previousIndex()>=i0&&i.previousIndex()<i1){
+				if (selectedNodes!=null&&selectedNodes.contains(node.getNode())){
+					Color oldColor=g2.getColor();
+					g2.setColor(highlightColor);
+					g2.fillRect(clipBounds.x,(int)Math.round(i.previousIndex()*rowHeight),clipBounds.width,(int)Math.round(rowHeight));
+					g2.setColor(oldColor);
+				}
 				if (!node.isSchedule()) continue;
 				nodeList.add(node);
 				paintAnnotation(g2,node);

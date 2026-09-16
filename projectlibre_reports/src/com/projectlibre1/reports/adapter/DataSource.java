@@ -71,6 +71,7 @@ import com.projectlibre1.grouping.core.model.NodeModelDataFactory;
 import com.projectlibre1.grouping.core.model.WalkersNodeModel;
 import com.projectlibre1.grouping.core.transform.filtering.PredicatedNodeFilterIterator;
 import com.projectlibre1.pm.task.Project;
+import com.projectlibre1.pm.task.Task;
 import com.projectlibre1.pm.time.MutableInterval;
 
 /**
@@ -164,7 +165,29 @@ public class DataSource implements JRDataSource, ObjectRef {
 			// convert ProjectLibre type into jasper accepted types	
 			result = DataSourceProvider.fieldValueConverterToPrimitiveType(field,field.getValue(this,context));
 		}
+		if (result instanceof String && "Field.name".equals(field.getId()))
+			result = indentToOutlineLevel((String)result);
 		return result;
+	}
+
+	/**
+	 * Indents a name by two spaces per outline level below the top, so the report shows the task
+	 * hierarchy the way the spreadsheet does. The level comes from the task itself rather than the
+	 * report row order, so it stays right when the rows are filtered or sorted.
+	 */
+	private String indentToOutlineLevel(String name) {
+		if (name == null)
+			return null;
+		Object impl = (currentObject instanceof Node) ? ((Node)currentObject).getImpl() : currentObject;
+		if (!(impl instanceof Task))
+			return name;
+		int level = ((Task)impl).getOutlineLevel();
+		if (level <= 1)
+			return name;
+		StringBuffer indented = new StringBuffer((level - 1) * 2 + name.length());
+		for (int i = 1; i < level; i++)
+			indented.append("  ");
+		return indented.append(name).toString();
 	}
 
 	public Node getNode() {

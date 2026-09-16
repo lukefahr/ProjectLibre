@@ -63,8 +63,11 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 import javax.swing.JScrollPane;
+import javax.swing.ListSelectionModel;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 
 import com.projectlibre1.help.HelpUtil;
 import com.projectlibre1.menu.MenuActionConstants;
@@ -174,6 +177,41 @@ public class GanttView extends SplittedView implements BaseView, ScheduleEventLi
 			}
 		});
 
+		//highlight the chart rows of the spreadsheet selection. Listen to the row selection model
+		//rather than to node selection events: those are skipped for empty selections and while a
+		//selection is still adjusting, which used to leave the highlight on a stale row.
+		final ListSelectionListener selectionHighlightListener=new ListSelectionListener(){
+			public void valueChanged(ListSelectionEvent e){
+				updateGanttSelectionHighlight();
+			}
+		};
+		spreadSheet.getSelectionModel().addListSelectionListener(selectionHighlightListener);
+		//the selection model is replaced whenever the model or the columns change, so follow it
+		spreadSheet.addPropertyChangeListener("selectionModel",new java.beans.PropertyChangeListener(){
+			public void propertyChange(java.beans.PropertyChangeEvent e){
+				if (e.getOldValue() instanceof ListSelectionModel)
+					((ListSelectionModel)e.getOldValue()).removeListSelectionListener(selectionHighlightListener);
+				if (e.getNewValue() instanceof ListSelectionModel)
+					((ListSelectionModel)e.getNewValue()).addListSelectionListener(selectionHighlightListener);
+				updateGanttSelectionHighlight();
+			}
+		});
+
+		//clicking in the chart selects the matching spreadsheet row. Reuses the row header's own
+		//changeSelection so the row selects exactly as it does when its row number is clicked.
+		gantt.addMouseListener(new java.awt.event.MouseAdapter(){
+			public void mousePressed(java.awt.event.MouseEvent e){
+				if (!javax.swing.SwingUtilities.isLeftMouseButton(e)) return;
+				int rowHeight=gantt.getRowHeight();
+				if (rowHeight<=0||spreadSheet==null) return;
+				int row=e.getY()/rowHeight;
+				if (row<0||row>=spreadSheet.getRowCount()) return;
+				boolean toggle=e.isControlDown()||e.isMetaDown();
+				boolean extend=e.isShiftDown();
+				spreadSheet.getRowHeader().changeSelection(row,0,toggle,extend);
+			}
+		});
+
 
 		//TODO automatic scrolling to add as an option
 //		spreadSheet.getRowHeader().getSelectionModel().addListSelectionListener(new ListSelectionListener(){
@@ -250,6 +288,21 @@ public class GanttView extends SplittedView implements BaseView, ScheduleEventLi
 
    public void activateEmptyRowHeader(boolean activate){
     ganttScrollPane.activateEmptyRowHeader(activate);
+   }
+
+   /**
+    * Mirrors the spreadsheet's current row selection as a highlight in the chart. Reads the
+    * selection instead of trusting an event payload so the highlight can never lag behind it.
+    */
+   protected void updateGanttSelectionHighlight(){
+	   if (spreadSheet==null||gantt==null) return;
+	   java.util.List nodes=null;
+	   try {
+		   nodes=spreadSheet.getSelectedNodes();
+	   } catch (RuntimeException ex) {
+		   nodes=null; //selection can briefly reference rows the model has already dropped
+	   }
+	   gantt.setSelectedNodes(nodes);
    }
 
 	//spreadsheet fields

@@ -197,7 +197,45 @@ public class TimeSpreadSheetModel extends CommonSpreadSheetModel implements Time
 	}
 	
 
+	/**
+	 * Working time available in the period shown by a column, per the project calendar. For a
+	 * standard 8h/day, 5day/week calendar a weekly column yields 40 hours, and day, month or
+	 * quarter columns scale accordingly. Returns 0 when it cannot be determined.
+	 */
+	protected long[] intervalWorkingTime=null; //per column cache: the calendar walk below is costly
+
+	public long getIntervalWorkingTime(int col){
+		int index=col-1;
+		if (timeIntervals==null||index<0||index>=timeIntervals.size()) return 0;
+		if (intervalWorkingTime==null||intervalWorkingTime.length!=timeIntervals.size()){
+			intervalWorkingTime=new long[timeIntervals.size()];
+			java.util.Arrays.fill(intervalWorkingTime,-1L);
+		}
+		if (intervalWorkingTime[index]>=0) return intervalWorkingTime[index];
+		long computed=computeIntervalWorkingTime(index);
+		intervalWorkingTime[index]=computed;
+		return computed;
+	}
+
+	private long computeIntervalWorkingTime(int index){
+		HasStartAndEnd interval=(HasStartAndEnd)timeIntervals.get(index);
+		if (interval==null||coord==null) return 0;
+		long available=0;
+		com.projectlibre1.pm.task.Project project=coord.getProject();
+		if (project!=null){
+			com.projectlibre1.pm.calendar.WorkCalendar workCalendar=project.getEffectiveWorkCalendar();
+			if (workCalendar!=null)
+				available=workCalendar.compare(interval.getEnd(),interval.getStart(),false);
+		}
+		if (available>0) return available;
+		//fall back to a nominal 8h day / 5 day week when the calendar cannot answer
+		long elapsed=interval.getEnd()-interval.getStart();
+		if (elapsed<=0) return 0;
+		return (long)(elapsed*(5.0/7.0)*(8.0/24.0));
+	}
+
 	void resetTimeIntervals(){
+		intervalWorkingTime=null;
 		timeIntervals.clear();
 	}
 	void addTimeInterval(HasStartAndEnd interval){

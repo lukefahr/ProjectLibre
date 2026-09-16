@@ -56,6 +56,7 @@
 package com.projectlibre1.pm.graphic.spreadsheet.renderer;
 
 import java.awt.Component;
+import java.awt.Font;
 
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -65,6 +66,8 @@ import javax.swing.table.DefaultTableCellRenderer;
 
 import com.projectlibre1.pm.graphic.frames.GraphicManager;
 import com.projectlibre1.pm.graphic.model.cache.GraphicNode;
+import com.projectlibre1.pm.graphic.spreadsheet.common.CommonSpreadSheet;
+import com.projectlibre1.pm.graphic.spreadsheet.common.SpreadSheetRowHeader;
 import com.projectlibre1.pm.graphic.spreadsheet.SpreadSheetParams;
 import com.projectlibre1.field.Field;
 import com.projectlibre1.util.Environment;
@@ -81,6 +84,18 @@ public class SpreadSheetRowHeaderRenderer extends DefaultTableCellRenderer  impl
 		super();
 	}
 	Component last=null;
+	private Font plainFont=null;
+	private Font boldFont=null;
+
+	/** Bold companion of the header font, derived once per font instance. */
+	private Font boldVersionOf(Font font){
+		if (font==null) return null;
+		if (font!=plainFont){
+			plainFont=font;
+			boldFont=font.deriveFont(Font.BOLD);
+		}
+		return boldFont;
+	}
 	public Component getTableCellRendererComponent (JTable table, Object value,boolean isSelected, boolean hasFocus, int row, int column){
 		JLabel component;
 		if (table==null){
@@ -90,13 +105,23 @@ public class SpreadSheetRowHeaderRenderer extends DefaultTableCellRenderer  impl
 		else{
 			component=(JLabel)super.getTableCellRendererComponent(table, value, isSelected,hasFocus, row, column);
 
+			//the row header keeps its own selection model and it is cleared whenever a cell is
+			//selected in the table itself, so ask the table: that tracks every way a row gets selected
+			boolean rowSelected=isSelected;
+			if (!rowSelected&&table instanceof SpreadSheetRowHeader){
+				CommonSpreadSheet spreadSheet=((SpreadSheetRowHeader)table).getSpreadSheet();
+				if (spreadSheet!=null&&row>=0&&row<spreadSheet.getRowCount())
+					rowSelected=spreadSheet.isRowSelected(row);
+			}
+
 			component.setForeground (table.getTableHeader().getForeground());
 			if (Environment.isNewLaf()||Environment.isMac())
 				component.setBackground(isSelected ? GraphicManager.getInstance().getLafManager().getSelectedBackgroundColor() : GraphicManager.getInstance().getLafManager().getUnselectedBackgroundColor());
 			else
 				component.setBackground(isSelected ? GraphicManager.getInstance().getLafManager().getSelectedBackgroundColor() : table.getTableHeader().getBackground());
 
-			component.setFont (table.getTableHeader ().getFont());
+			Font headerFont=table.getTableHeader ().getFont();
+			component.setFont (rowSelected?boldVersionOf(headerFont):headerFont);
 		}
 		component.setHorizontalAlignment (CENTER);
 		component.setText (value == null ? "" : value.toString ());

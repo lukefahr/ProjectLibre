@@ -67,6 +67,7 @@ public interface TaskSpecificFields {
 	double getFixedCost();
 	void setFixedCost(double fixedCost);	
 	boolean isWbsParent();
+	int getOutlineLevel();
 	String getWbsParentName();
 	WorkCalendar getTaskCalendar();
 	void setTaskCalendar(WorkCalendar workCalendar);

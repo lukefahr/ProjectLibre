@@ -135,6 +135,9 @@ public class GanttParamsImpl implements GanttParams, Serializable,Cloneable {
 		return getGanttBounds();
 	}
 
+	public java.util.Set getSelectedNodes() {
+		return null; //printing and export are never highlighted
+	}
 	public Font getColumnHeaderFont() {
 		return columnHeaderFont;
 	}

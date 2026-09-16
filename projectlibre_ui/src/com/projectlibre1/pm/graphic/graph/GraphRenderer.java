@@ -61,14 +61,31 @@ import java.util.List;
 import java.util.ListIterator;
 
 import com.projectlibre1.pm.graphic.Renderer;
+import com.projectlibre1.pm.graphic.model.cache.GraphicDependency;
 import com.projectlibre1.pm.graphic.model.cache.GraphicNode;
+import com.projectlibre1.pm.task.Task;
 import com.projectlibre1.graphic.configuration.shape.Colors;
 import com.projectlibre1.graphic.configuration.shape.PredefinedStroke;
 
 public abstract class GraphRenderer extends Renderer{
 	public static Stroke DISABLED_LINK_STROKE = PredefinedStroke.SPARSE_DASHED;
 	public static Color EXTERNAL_LINK_COLOR = Color.LIGHT_GRAY;
+	public static Color CRITICAL_LINK_COLOR = Color.RED;
 	public static Color NON_WORKING_COLOR = Colors.VERY_LIGHT_GRAY;;
+
+	/**
+	 * A dependency is drawn as part of the critical path when the tasks at both of its ends are
+	 * critical, matching how critical bars themselves are coloured.
+	 */
+	public static boolean isCriticalLink(GraphicDependency dependency){
+		if (dependency==null) return false;
+		return isCriticalNode(dependency.getPredecessor())&&isCriticalNode(dependency.getSuccessor());
+	}
+	private static boolean isCriticalNode(GraphicNode node){
+		if (node==null||node.getNode()==null) return false;
+		Object impl=node.getNode().getImpl();
+		return (impl instanceof Task)&&((Task)impl).isCritical();
+	}
 	
 	public GraphRenderer(GraphParams graphInfo){
 		super(graphInfo);

@@ -354,7 +354,7 @@ public class ReportAdapter {
 				staticText.setBackcolor(new Color(0x33, 0x33, 0x33));
 			}
 			staticText.setMode(JRElement.MODE_OPAQUE);
-			staticText.setTextAlignment(JRTextElement.TEXT_ALIGN_RIGHT);
+			staticText.setTextAlignment(alignmentFor(field));
 			staticText.setFont(boldFont);
 			staticText.setText(field.getName());
 			band.addElement(staticText);
@@ -365,6 +365,13 @@ public class ReportAdapter {
 		return band;
 	}
 	
+	/** Task/resource names read far better flush left; every other column stays right aligned. */
+	private static byte alignmentFor(Field field) {
+		return "Field.name".equals(field.getId())
+			? JRTextElement.TEXT_ALIGN_LEFT
+			: JRTextElement.TEXT_ALIGN_RIGHT;
+	}
+
 	private JRDesignBand getFieldsHeader(SpreadSheetFieldArray fields, boolean isSub) throws JRException {
 		//Page header
 		JRDesignBand band = new JRDesignBand();
@@ -399,7 +406,7 @@ public class ReportAdapter {
 			}
 			textField.setX(x);
 			textField.setWidth(field.getColumnWidth());
-			textField.setTextAlignment(JRTextElement.TEXT_ALIGN_RIGHT);
+			textField.setTextAlignment(alignmentFor(field));
 
 			String fieldName = getFieldName(field, false);
 			if(field.isMoney()) {
@@ -449,7 +456,7 @@ public class ReportAdapter {
 				textField.setY(4);
 				textField.setWidth(field.getColumnWidth());
 				textField.setHeight(12);
-				textField.setTextAlignment(JRTextElement.TEXT_ALIGN_RIGHT);
+				textField.setTextAlignment(alignmentFor(field));
 				textField.setFont(normalFont);
 				JRDesignExpression expression = new JRDesignExpression();
 

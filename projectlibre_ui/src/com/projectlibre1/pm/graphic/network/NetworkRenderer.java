@@ -173,6 +173,8 @@ public abstract class NetworkRenderer extends GraphRenderer{
 					g2.setStroke(GraphRenderer.DISABLED_LINK_STROKE);
 				if (dep != null && dep.isCrossProject())
 					g2.setColor(GraphRenderer.EXTERNAL_LINK_COLOR);
+				else if (GraphRenderer.isCriticalLink(dependency))
+					g2.setColor(GraphRenderer.CRITICAL_LINK_COLOR);
 				else
 					g2.setColor(format.getMiddle().getColor());
 				g2.draw(path);

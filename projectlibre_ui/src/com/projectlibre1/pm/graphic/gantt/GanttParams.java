@@ -69,4 +69,10 @@ public interface GanttParams extends GraphParams{
 	public Font getColumnHeaderFont();
 	public void setColumnHeaderFont(Font columnHeaderFont);
 	public Rectangle getGanttBounds();
+	/**
+	 * @return the model nodes whose rows are selected in the companion spreadsheet,
+	 * or null if none: their rows are highlighted in the chart. Implementations
+	 * used for printing/export return null so output is never highlighted.
+	 */
+	public java.util.Set getSelectedNodes();
 }

@@ -105,20 +105,40 @@ public class ScaledScrollPane extends JScrollPane implements TimeScaleListener, 
 	}
 
 	/**
+	 * Wheel travel needed per timescale step. The timescale has only a handful of discrete
+	 * levels, so zooming on every wheel event runs through the whole range at once -- especially
+	 * on trackpads, which emit many small events per gesture. Raise for slower zooming.
+	 */
+	protected static final double ZOOM_WHEEL_TRAVEL_PER_STEP = 2.0;
+	protected double zoomWheelTravel = 0;
+
+	/**
 	 * Ctrl (or Cmd) + mouse wheel zooms the timescale in/out; a plain wheel scrolls as usual.
 	 * Overriding here (instead of adding a listener) lets a zoom gesture consume the event so it
 	 * never also scrolls the pane.
 	 */
 	protected void processMouseWheelEvent(MouseWheelEvent e) {
 		if (coord != null && (e.isControlDown() || e.isMetaDown())) {
-			int rotation = e.getWheelRotation();
-			if (rotation < 0)
-				coord.zoomIn();
-			else if (rotation > 0)
-				coord.zoomOut();
+			//precise rotation so trackpad gestures accumulate smoothly instead of snapping to +-1
+			double rotation = e.getPreciseWheelRotation();
+			if (rotation != 0) {
+				//start over on reversal so changing direction responds right away
+				if (zoomWheelTravel != 0 && Math.signum(rotation) != Math.signum(zoomWheelTravel))
+					zoomWheelTravel = 0;
+				zoomWheelTravel += rotation;
+				while (zoomWheelTravel <= -ZOOM_WHEEL_TRAVEL_PER_STEP) {
+					zoomWheelTravel += ZOOM_WHEEL_TRAVEL_PER_STEP;
+					coord.zoomIn();
+				}
+				while (zoomWheelTravel >= ZOOM_WHEEL_TRAVEL_PER_STEP) {
+					zoomWheelTravel -= ZOOM_WHEEL_TRAVEL_PER_STEP;
+					coord.zoomOut();
+				}
+			}
 			e.consume();
 			return;
 		}
+		zoomWheelTravel = 0;
 		super.processMouseWheelEvent(e);
 	}
 

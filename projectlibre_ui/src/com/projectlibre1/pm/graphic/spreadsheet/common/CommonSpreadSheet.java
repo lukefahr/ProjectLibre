@@ -139,6 +139,25 @@ public class CommonSpreadSheet extends CommonTable implements CacheListener, Sav
 		rowHeader=new SpreadSheetRowHeader(this);
 		rowHeader.setRowHeight(getRowHeight());
 
+		//the row header renders the table's row selection (bold row index), but it is a separate
+		//table, so repaint it whenever that selection changes -- however the change was made
+		final javax.swing.event.ListSelectionListener rowHeaderRepainter=new javax.swing.event.ListSelectionListener(){
+			public void valueChanged(javax.swing.event.ListSelectionEvent e){
+				if (rowHeader!=null) rowHeader.repaint();
+			}
+		};
+		getSelectionModel().addListSelectionListener(rowHeaderRepainter);
+		//the selection model is replaced when the model or the columns change, so follow it
+		addPropertyChangeListener("selectionModel",new java.beans.PropertyChangeListener(){
+			public void propertyChange(java.beans.PropertyChangeEvent e){
+				if (e.getOldValue() instanceof javax.swing.ListSelectionModel)
+					((javax.swing.ListSelectionModel)e.getOldValue()).removeListSelectionListener(rowHeaderRepainter);
+				if (e.getNewValue() instanceof javax.swing.ListSelectionModel)
+					((javax.swing.ListSelectionModel)e.getNewValue()).addListSelectionListener(rowHeaderRepainter);
+				if (rowHeader!=null) rowHeader.repaint();
+			}
+		});
+
 		setFocusCycleRoot(true);
 
 	}

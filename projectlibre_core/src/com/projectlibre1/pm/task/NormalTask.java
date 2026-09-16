@@ -1283,20 +1283,54 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 	 * EarnedValueValues
 	 **************************************************************************/
 
+	//earned value inputs, selectors for rollUpEarnedValue
+	private static final int EV_ACWP=0, EV_BAC=1, EV_BCWP=2, EV_BCWS=3;
+
+	/**
+	 * Rolls a summary task's earned value input up from its children. Summary rows normally carry
+	 * no assignments of their own, so without this SPI (BCWP/BCWS) and the other earned value
+	 * measures are undefined on every summary row.
+	 *
+	 * All four inputs roll up together on purpose: rolling up only the two SPI needs would leave
+	 * derived measures comparing a rolled up figure against an unrolled one, e.g. CV = BCWP-ACWP.
+	 * Nested summaries work because each child is asked for its own already rolled up value.
+	 */
+	private double rollUpEarnedValue(double own, int which, long start, long end) {
+		if (!isWbsParent()) return own;
+		//as in cost(), a parent's placeholder assignment is not real work of its own
+		double total = isParentWithoutAssignments() ? 0.0D : own;
+		Collection children = getWbsChildrenNodes();
+		if (children == null) return total;
+		Object current;
+		for (Iterator i = children.iterator(); i.hasNext();) {
+			current = ((Node) i.next()).getImpl();
+			if (!(current instanceof NormalTask))
+				continue;
+			NormalTask child = (NormalTask) current;
+			switch (which) {
+				case EV_ACWP: total += child.acwp(start, end); break;
+				case EV_BAC: total += child.bac(start, end); break;
+				case EV_BCWP: total += child.bcwp(start, end); break;
+				case EV_BCWS: total += child.bcws(start, end); break;
+			}
+		}
+		return total;
+	}
+
 	public double acwp(long start, long end) {
-		return ((TaskSnapshot) getCurrentSnapshot()).acwp(start, end);
+		return rollUpEarnedValue(((TaskSnapshot) getCurrentSnapshot()).acwp(start, end),EV_ACWP,start,end);
 	}
 
 	public double bac(long start, long end) {
-		return ((TaskSnapshot) getCurrentSnapshot()).bac(start, end);
+		return rollUpEarnedValue(((TaskSnapshot) getCurrentSnapshot()).bac(start, end),EV_BAC,start,end);
 	}
 
 	public double bcwp(long start, long end) {
-		return ((TaskSnapshot) getCurrentSnapshot()).bcwp(start, end);
+		return rollUpEarnedValue(((TaskSnapshot) getCurrentSnapshot()).bcwp(start, end),EV_BCWP,start,end);
 	}
 
 	public double bcws(long start, long end) {
-		return ((TaskSnapshot) getCurrentSnapshot()).bcws(start, end);
+		return rollUpEarnedValue(((TaskSnapshot) getCurrentSnapshot()).bcws(start, end),EV_BCWS,start,end);
 	}
 
 	boolean isInRange(long start, long finish) {

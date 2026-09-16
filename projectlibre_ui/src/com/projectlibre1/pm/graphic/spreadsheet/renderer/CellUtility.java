@@ -66,6 +66,8 @@ import javax.swing.border.LineBorder;
 import com.projectlibre1.pm.graphic.frames.GraphicManager;
 import com.projectlibre1.pm.graphic.model.cache.GraphicNode;
 import com.projectlibre1.pm.graphic.spreadsheet.common.CommonSpreadSheetModel;
+import com.projectlibre1.pm.graphic.spreadsheet.time.TimeSpreadSheetModel;
+import com.projectlibre1.datatype.Duration;
 import com.projectlibre1.graphic.configuration.CellFormat;
 import com.projectlibre1.graphic.configuration.shape.Colors;
 import com.projectlibre1.util.Environment;
@@ -106,6 +108,26 @@ public class CellUtility {
 				component.setForeground(Color.GRAY);
 			}
 		}
+		markOverallocation(table,value,isSelected,row,column,component,model);
+	}
+
+	/** Foreground for a period holding more work than its working time allows. */
+	public static Color OVERALLOCATED_FOREGROUND = new Color(200,0,0);
+	public static Color OVERALLOCATED_BACKGROUND = new Color(255,205,205);
+
+	/**
+	 * Flags a usage cell whose work exceeds the working time available in the period it covers --
+	 * 40 hours for a weekly column on a standard calendar. Runs last because the colour handling
+	 * above resets the foreground and background of every cell.
+	 */
+	private static void markOverallocation(JTable table, Object value, boolean isSelected, int row, int column, JComponent component, CommonSpreadSheetModel model){
+		if (isSelected||!(value instanceof Duration)||!(model instanceof TimeSpreadSheetModel)) return;
+		long available=((TimeSpreadSheetModel)model).getIntervalWorkingTime(table.convertColumnIndexToModel(column));
+		if (available<=0||((Duration)value).longValue()<=available) return;
+		component.setForeground(OVERALLOCATED_FOREGROUND);
+		component.setBackground(OVERALLOCATED_BACKGROUND);
+		component.setOpaque(true);
+		component.setFont(component.getFont().deriveFont(java.awt.Font.BOLD));
 	}
 
 	public static void setAppearance(CellFormat format, JComponent component){

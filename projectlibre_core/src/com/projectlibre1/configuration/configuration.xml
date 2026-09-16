@@ -441,6 +441,8 @@
 			</field>
 			<field property="wbsParent" id="Field.wbsParent"
 				readOnly="true" />
+			<field property="outlineLevel" id="Field.outlineLevel"
+				readOnly="true" />
 			<field property="wbsParentName" id="Field.wbsParentName"
 				readOnly="true" />
 			<field property="resourceInitials" help="Assign_Resources#Resources_on_the_Gantt_spreadsheet"

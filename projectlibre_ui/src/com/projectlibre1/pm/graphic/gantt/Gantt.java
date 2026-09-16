@@ -202,6 +202,22 @@ public class Gantt extends Graph implements ScaledComponent, TimeScaleListener, 
 	public Rectangle getGanttBounds(){
 		return getDrawingBounds();
 	}
+
+	protected java.util.Set selectedNodes=null;
+	/**
+	 * Rows of these model nodes are highlighted in the chart, mirroring the
+	 * spreadsheet selection.
+	 */
+	public void setSelectedNodes(java.util.Collection nodes){
+		java.util.Set updated=(nodes==null||nodes.isEmpty())?null:new java.util.HashSet(nodes);
+		//selection events also fire while a drag is still adjusting: don't repaint for no change
+		if ((updated==null)?(selectedNodes==null):updated.equals(selectedNodes)) return;
+		selectedNodes=updated;
+		repaint();
+	}
+	public java.util.Set getSelectedNodes(){
+		return selectedNodes;
+	}
 	public boolean useTextures() {
 		return true;
 	}
