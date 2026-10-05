@@ -126,6 +126,7 @@ import com.projectlibre1.pm.dependency.DependencyService;
 import com.projectlibre1.pm.resource.ResourceImpl;
 import com.projectlibre1.pm.task.Portfolio;
 import com.projectlibre1.pm.task.Project;
+import com.projectlibre1.strings.Messages;
 import com.projectlibre1.pm.task.ProjectEvent;
 import com.projectlibre1.pm.task.ProjectFactory;
 import com.projectlibre1.pm.task.ProjectListener;
@@ -365,7 +366,44 @@ public class DocumentFrame extends NamedFrame implements
 
 
 	void doLevelResourcesDialog() {
-//		ResourceLevelingDialogBox.getInstance(getGraphicManager().getFrame(), null).doModal();
+		finishAnyOperations();
+		Project project = getProject();
+		if (project == null)
+			return;
+		String level = Messages.getString("Leveling.level"); //$NON-NLS-1$
+		String clear = Messages.getString("Leveling.clear"); //$NON-NLS-1$
+		Object[] options = { level, clear, Messages.getString("Text.Cancel") }; //$NON-NLS-1$
+		int choice = javax.swing.JOptionPane.showOptionDialog(getGraphicManager().getFrame(),
+				Messages.getString("Leveling.prompt"), Messages.getString("Leveling.title"), //$NON-NLS-1$ //$NON-NLS-2$
+				javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+		if (choice == 0) {
+			com.projectlibre1.pm.scheduling.SerialResourceLeveler.Result result =
+					new com.projectlibre1.pm.scheduling.SerialResourceLeveler(project).level();
+			project.setDirty(true);
+			StringBuffer message = new StringBuffer(Messages.getString("Leveling.summary")); //$NON-NLS-1$
+			message.append("\n").append(result.delayed).append(" ").append(Messages.getString("Leveling.tasksDelayed")); //$NON-NLS-1$ //$NON-NLS-2$
+			message.append("\n").append(result.overloadedDaysBefore).append(" -> ").append(result.overloadedDaysAfter) //$NON-NLS-1$ //$NON-NLS-2$
+					.append(" ").append(Messages.getString("Leveling.overloadedDays")); //$NON-NLS-1$ //$NON-NLS-2$
+			if (result.unresolved > 0)
+				message.append("\n").append(result.unresolved).append(" ").append(Messages.getString("Leveling.unresolved")); //$NON-NLS-1$ //$NON-NLS-2$
+			if (!result.remaining.isEmpty()) {
+				message.append("\n\n").append(Messages.getString("Leveling.remaining")); //$NON-NLS-1$ //$NON-NLS-2$
+				int shown = 0;
+				for (String line : result.remaining) {
+					if (shown++ == 12) {
+						message.append("\n..."); //$NON-NLS-1$
+						break;
+					}
+					message.append("\n").append(line); //$NON-NLS-1$
+				}
+			}
+			javax.swing.JOptionPane.showMessageDialog(getGraphicManager().getFrame(), message.toString(),
+					Messages.getString("Leveling.title"), javax.swing.JOptionPane.INFORMATION_MESSAGE); //$NON-NLS-1$
+		} else if (choice == 1) {
+			int cleared = com.projectlibre1.pm.scheduling.SerialResourceLeveler.clearLevelingDelays(project);
+			if (cleared > 0)
+				project.setDirty(true);
+		}
 	}
 
 
