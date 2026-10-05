@@ -55,8 +55,13 @@ import com.projectlibre1.pm.time.MutableInterval;
  * repeats. Tasks that have started, are external, or carry priority 1000 are never
  * moved but still count toward the load of their resources.
  *
- * Existing leveling delays are discarded first, so running the leveler twice gives the
- * same answer, and {@link #clearLevelingDelays(Project)} undoes everything it did.
+ * The run can be limited to a set of resources: only tasks using those resources are
+ * moved and only those resources are checked, while every other task keeps its current
+ * leveling delay and still counts as load. With {@link #setWithinSlackOnly(boolean)} a task
+ * that cannot be resolved within the total slack it had is left where it is and reported
+ * as unresolved. Leveling delays of the tasks being placed are
+ * reset first, so repeating a run gives the same answer. {@link #captureDelays()} and
+ * {@link #restoreDelays(Map)} let a caller preview a run and back out of it.
  */
 public class SerialResourceLeveler {
 	/** As in MS Project, this priority means "do not level". */
@@ -65,7 +70,26 @@ public class SerialResourceLeveler {
 	private static final long TOLERANCE = WorkCalendar.MILLIS_IN_MINUTE;
 	private static final int MAX_MOVES_PER_TASK = 400;
 
+	/** A task the leveler delayed. */
+	public static class Move {
+		public final Task task;
+		public final long oldStart;
+		public final long newStart;
+		public final long delay;
+		public final boolean resolved;
+		Move(Task task, long oldStart, long newStart, long delay, boolean resolved) {
+			this.task = task;
+			this.oldStart = oldStart;
+			this.newStart = newStart;
+			this.delay = delay;
+			this.resolved = resolved;
+		}
+	}
+
 	public static class Result {
+		public final List<Move> moves = new ArrayList<Move>();
+		/** Tasks left in place because moving them would exceed their slack (within-slack mode). */
+		final List<Task> heldForSlack = new ArrayList<Task>();
 		public int candidates;
 		public int fixed;
 		public int delayed;
@@ -100,6 +124,8 @@ public class SerialResourceLeveler {
 	}
 
 	private final Project project;
+	private Set<Resource> scope = null;
+	private boolean withinSlackOnly = false;
 	private final Map<Resource, Map<Long, Long>> load = new HashMap<Resource, Map<Long, Long>>();
 	private final Map<Task, Contribution> counted = new HashMap<Task, Contribution>();
 	private final Map<Task, Set<Task>> predecessorCache = new HashMap<Task, Set<Task>>();
@@ -108,12 +134,45 @@ public class SerialResourceLeveler {
 		this.project = project;
 	}
 
-	/** Removes every leveling delay and reschedules. Returns how many tasks were affected. */
-	public static int clearLevelingDelays(Project project) {
+	/** Limits leveling to tasks using these resources; null means every resource. */
+	public void setScope(Collection<Resource> resources) {
+		scope = resources == null ? null : new HashSet<Resource>(resources);
+	}
+
+	/** When set, a task is never delayed beyond the total slack it had before the run. */
+	public void setWithinSlackOnly(boolean withinSlackOnly) {
+		this.withinSlackOnly = withinSlackOnly;
+	}
+
+	/** Current leveling delay of every task, for {@link #restoreDelays(Map)}. */
+	public Map<Task, Long> captureDelays() {
+		Map<Task, Long> delays = new HashMap<Task, Long>();
+		for (Iterator i = project.getTasks().iterator(); i.hasNext();) {
+			Task task = (Task) i.next();
+			delays.put(task, task.getLevelingDelay());
+		}
+		return delays;
+	}
+
+	/** Puts back delays captured earlier and reschedules. Returns how many tasks changed. */
+	public int restoreDelays(Map<Task, Long> delays) {
+		int changed = 0;
+		for (Map.Entry<Task, Long> entry : delays.entrySet()) {
+			if (entry.getKey().getLevelingDelay() != entry.getValue()) {
+				entry.getKey().setLevelingDelay(entry.getValue());
+				changed++;
+			}
+		}
+		project.recalculate();
+		return changed;
+	}
+
+	/** Removes the leveling delay of every task using a resource in scope and reschedules. */
+	public int clearLevelingDelays() {
 		int cleared = 0;
 		for (Iterator i = project.getTasks().iterator(); i.hasNext();) {
 			Task task = (Task) i.next();
-			if (task.getLevelingDelay() != 0) {
+			if (task.getLevelingDelay() != 0 && usesScopedResource(task)) {
 				task.setLevelingDelay(0);
 				cleared++;
 			}
@@ -122,28 +181,72 @@ public class SerialResourceLeveler {
 		return cleared;
 	}
 
-	public Result level() {
-		Result result = new Result();
-		clearLevelingDelays(project);
+	/** Removes every leveling delay in the project and reschedules. */
+	public static int clearLevelingDelays(Project project) {
+		return new SerialResourceLeveler(project).clearLevelingDelays();
+	}
 
+	public Result level() {
 		List<Task> candidates = new ArrayList<Task>();
 		List<Task> fixed = new ArrayList<Task>();
 		for (Iterator i = project.getTasks().iterator(); i.hasNext();) {
 			Task task = (Task) i.next();
 			if (task.isWbsParent() || !hasLaborAssignments(task))
 				continue;
-			if (isMovable(task))
+			if (isMovable(task) && usesScopedResource(task))
 				candidates.add(task);
 			else
 				fixed.add(task);
 		}
-		result.candidates = candidates.size();
-		result.fixed = fixed.size();
+		// the tasks about to be placed start from scratch; everything else keeps its delay
+		for (Task task : candidates)
+			if (task.getLevelingDelay() != 0)
+				task.setLevelingDelay(0);
+		project.recalculate();
+		Map<Task, Long> slackBefore = new HashMap<Task, Long>();
+		if (withinSlackOnly)
+			for (Task task : candidates)
+				slackBefore.put(task, task.getTotalSlack());
 
 		List<Task> all = new ArrayList<Task>(fixed);
 		all.addAll(candidates);
-		result.overloadedDaysBefore = countOverloadedDays(all, null);
+		int overloadedDaysBefore = countOverloadedDays(all, null);
 
+		// Within slack only: a task that cannot be resolved stays put, and the tasks placed
+		// before it did not know that. Hold such tasks in place and place the rest again,
+		// until no new one turns up.
+		Set<Task> held = new HashSet<Task>();
+		Result result;
+		for (int round = 0;; round++) {
+			List<Task> toPlace = new ArrayList<Task>(candidates);
+			toPlace.removeAll(held);
+			List<Task> inPlace = new ArrayList<Task>(fixed);
+			inPlace.addAll(held);
+			for (Task task : toPlace)
+				task.setLevelingDelay(0);
+			if (round > 0)
+				project.recalculate();
+			result = place(toPlace, inPlace, slackBefore);
+			if (!withinSlackOnly || result.heldForSlack.isEmpty() || round >= 8)
+				break;
+			held.addAll(result.heldForSlack);
+		}
+		result.candidates = candidates.size();
+		result.fixed = fixed.size();
+		result.unresolved += held.size();
+		for (Task task : held)
+			result.details.add(task.getId() + " " + task.getName() + ": not moved (would exceed slack)");
+		result.overloadedDaysBefore = overloadedDaysBefore;
+		result.overloadedDaysAfter = countOverloadedDays(all, result.remaining);
+		return result;
+	}
+
+	/** One serial pass: places {@code candidates} against {@code fixed}, which never move. */
+	private Result place(List<Task> candidates, List<Task> fixed, Map<Task, Long> slackBefore) {
+		Result result = new Result();
+		List<Task> heldForSlack = result.heldForSlack;
+		load.clear();
+		counted.clear();
 		for (Task task : fixed)
 			addToLoad(task);
 
@@ -152,6 +255,7 @@ public class SerialResourceLeveler {
 			Task task = pickNext(unplaced);
 			unplaced.remove(task);
 			refreshCounted();
+			long oldStart = task.getStart();
 			long delay = 0;
 			int moves = 0;
 			boolean placed = false;
@@ -167,6 +271,14 @@ public class SerialResourceLeveler {
 				long extra = calendar.compare(afterOverloadedDay, start, false);
 				if (extra <= 0)
 					extra = WorkCalendar.MILLIS_IN_HOUR;
+				if (withinSlackOnly && delay + extra > slackBefore.get(task)) {
+					// cannot be resolved without pushing the finish date: leave the task where it was
+					delay = 0;
+					task.setLevelingDelay(0);
+					project.recalculate();
+					refreshCounted();
+					break;
+				}
 				delay += extra;
 				moves++;
 				task.setLevelingDelay(delay);
@@ -175,14 +287,16 @@ public class SerialResourceLeveler {
 			}
 			if (!placed)
 				result.unresolved++;
+			if (!placed && delay == 0)
+				heldForSlack.add(task);
 			if (delay > 0) {
 				result.delayed++;
 				result.totalDelay += delay;
+				result.moves.add(new Move(task, oldStart, task.getStart(), delay, placed));
 				result.details.add(task.getId() + " " + task.getName() + ": +" + (delay / (double) WorkCalendar.MILLIS_IN_HOUR) + "h" + (placed ? "" : " (unresolved)"));
 			}
 			addToLoad(task);
 		}
-		result.overloadedDaysAfter = countOverloadedDays(all, result.remaining);
 		return result;
 	}
 
@@ -207,6 +321,21 @@ public class SerialResourceLeveler {
 
 	private static Collection assignmentsOf(Task task) {
 		return task instanceof NormalTask ? ((NormalTask) task).getAssignments() : java.util.Collections.EMPTY_LIST;
+	}
+
+	private boolean inScope(Resource resource) {
+		return scope == null || scope.contains(resource);
+	}
+
+	private boolean usesScopedResource(Task task) {
+		if (scope == null)
+			return true;
+		for (Iterator i = assignmentsOf(task).iterator(); i.hasNext();) {
+			Assignment assignment = (Assignment) i.next();
+			if (assignment.isLabor() && !assignment.isDefault() && scope.contains(assignment.getResource()))
+				return true;
+		}
+		return false;
 	}
 
 	private static int priority(Task task) {
@@ -290,6 +419,8 @@ public class SerialResourceLeveler {
 			if (!assignment.isLabor() || assignment.isDefault())
 				continue;
 			Resource resource = assignment.getResource();
+			if (!inScope(resource))
+				continue;
 			Map<Long, Long> resourceLoad = load.get(resource);
 			for (long day = dayStart(task.getStart()); day < end; day = nextDay(day)) {
 				long work = workOn(assignment, day);
@@ -395,6 +526,8 @@ public class SerialResourceLeveler {
 		java.text.DateFormat dateFormat = java.text.DateFormat.getDateInstance(java.text.DateFormat.SHORT);
 		for (Map.Entry<Resource, Map<Long, Long>> byResource : total.entrySet()) {
 			Resource resource = byResource.getKey();
+			if (!inScope(resource))
+				continue;
 			for (Map.Entry<Long, Long> byDay : byResource.getValue().entrySet()) {
 				long capacity = capacityOn(resource, byDay.getKey());
 				if (byDay.getValue() <= capacity + TOLERANCE)

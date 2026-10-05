@@ -370,40 +370,17 @@ public class DocumentFrame extends NamedFrame implements
 		Project project = getProject();
 		if (project == null)
 			return;
-		String level = Messages.getString("Leveling.level"); //$NON-NLS-1$
-		String clear = Messages.getString("Leveling.clear"); //$NON-NLS-1$
-		Object[] options = { level, clear, Messages.getString("Text.Cancel") }; //$NON-NLS-1$
-		int choice = javax.swing.JOptionPane.showOptionDialog(getGraphicManager().getFrame(),
-				Messages.getString("Leveling.prompt"), Messages.getString("Leveling.title"), //$NON-NLS-1$ //$NON-NLS-2$
-				javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
-		if (choice == 0) {
-			com.projectlibre1.pm.scheduling.SerialResourceLeveler.Result result =
-					new com.projectlibre1.pm.scheduling.SerialResourceLeveler(project).level();
-			project.setDirty(true);
-			StringBuffer message = new StringBuffer(Messages.getString("Leveling.summary")); //$NON-NLS-1$
-			message.append("\n").append(result.delayed).append(" ").append(Messages.getString("Leveling.tasksDelayed")); //$NON-NLS-1$ //$NON-NLS-2$
-			message.append("\n").append(result.overloadedDaysBefore).append(" -> ").append(result.overloadedDaysAfter) //$NON-NLS-1$ //$NON-NLS-2$
-					.append(" ").append(Messages.getString("Leveling.overloadedDays")); //$NON-NLS-1$ //$NON-NLS-2$
-			if (result.unresolved > 0)
-				message.append("\n").append(result.unresolved).append(" ").append(Messages.getString("Leveling.unresolved")); //$NON-NLS-1$ //$NON-NLS-2$
-			if (!result.remaining.isEmpty()) {
-				message.append("\n\n").append(Messages.getString("Leveling.remaining")); //$NON-NLS-1$ //$NON-NLS-2$
-				int shown = 0;
-				for (String line : result.remaining) {
-					if (shown++ == 12) {
-						message.append("\n..."); //$NON-NLS-1$
-						break;
-					}
-					message.append("\n").append(line); //$NON-NLS-1$
-				}
+		// resources selected in a resource view are preselected in the dialog
+		java.util.List preselected = new java.util.ArrayList();
+		java.util.List nodes = getSelectedNodes(false);
+		if (nodes != null) {
+			for (java.util.Iterator i = nodes.iterator(); i.hasNext();) {
+				Object impl = ((com.projectlibre1.grouping.core.Node) i.next()).getImpl();
+				if (impl instanceof com.projectlibre1.pm.resource.Resource)
+					preselected.add(impl);
 			}
-			javax.swing.JOptionPane.showMessageDialog(getGraphicManager().getFrame(), message.toString(),
-					Messages.getString("Leveling.title"), javax.swing.JOptionPane.INFORMATION_MESSAGE); //$NON-NLS-1$
-		} else if (choice == 1) {
-			int cleared = com.projectlibre1.pm.scheduling.SerialResourceLeveler.clearLevelingDelays(project);
-			if (cleared > 0)
-				project.setDirty(true);
 		}
+		ResourceLevelingDialog.open(getGraphicManager().getFrame(), project, preselected);
 	}
 
 
