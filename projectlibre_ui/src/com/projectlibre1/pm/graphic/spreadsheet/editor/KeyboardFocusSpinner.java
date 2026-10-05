@@ -55,12 +55,19 @@
  *******************************************************************************/
 package com.projectlibre1.pm.graphic.spreadsheet.editor;
 
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
+import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
+import javax.swing.JComponent;
 import javax.swing.JFormattedTextField;
 import javax.swing.JSpinner;
 import javax.swing.KeyStroke;
 import javax.swing.SpinnerModel;
+import javax.swing.SwingUtilities;
 
 /**
  * Extension of regular spinner to handle case of spreadsheet cell activation by keystroke
@@ -69,6 +76,7 @@ import javax.swing.SpinnerModel;
 public class KeyboardFocusSpinner extends JSpinner  implements KeyboardFocusable {
 		public KeyboardFocusSpinner(SpinnerModel arg0) {
 			super(arg0);
+			listenToTextField();
 			// This code below doesn't work
 //			getTextField().addMouseListener(new MouseAdapter() {
 //				public void mousePressed(MouseEvent e) {
@@ -97,6 +105,65 @@ public class KeyboardFocusSpinner extends JSpinner  implements KeyboardFocusable
 
 		
 		public void selectAll(boolean keyboard) { // convenience method
+			if (keyboard) {
+				selectAllPending = false;
+				getTextField().selectAll();
+			} else {
+				// Editing was started by a click that the table still has to repost to the text field:
+				// the caret moves to the click point on release, and the formatted field re-formats its
+				// text when it gains focus. Select after each of those, as long as nothing was typed.
+				selectAllPending = true;
+				selectAllLater();
+			}
+		}
+
+		private boolean selectAllPending = false;
+		private JFormattedTextField listenedTextField = null;
+
+		public void setEditor(JComponent editor) {
+			super.setEditor(editor);
+			listenToTextField();
+		}
+
+		private void listenToTextField() {
+			JFormattedTextField textField;
+			try {
+				textField = getTextField();
+			} catch (ClassCastException e) {
+				return;
+			}
+			if (textField == null || textField == listenedTextField)
+				return;
+			listenedTextField = textField;
+			textField.addMouseListener(new MouseAdapter() {
+				public void mouseReleased(MouseEvent e) {
+					if (SwingUtilities.isLeftMouseButton(e))
+						selectAllIfPending();
+				}
+			});
+			textField.addFocusListener(new FocusAdapter() {
+				public void focusGained(FocusEvent e) {
+					selectAllLater(); // after JFormattedTextField has re-formatted
+				}
+			});
+			textField.addKeyListener(new KeyAdapter() {
+				public void keyTyped(KeyEvent e) {
+					selectAllPending = false; // the user has typed: leave the text alone from now on
+				}
+			});
+		}
+
+		private void selectAllLater() {
+			SwingUtilities.invokeLater(new Runnable() {
+				public void run() {
+					selectAllIfPending();
+				}
+			});
+		}
+
+		private void selectAllIfPending() {
+			if (!selectAllPending)
+				return;
 			getTextField().selectAll();
 		}
 		

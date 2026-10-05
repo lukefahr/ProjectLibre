@@ -64,7 +64,9 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 
 import com.projectlibre1.pm.graphic.frames.GraphicManager;
+import com.projectlibre1.pm.assignment.Assignment;
 import com.projectlibre1.pm.graphic.model.cache.GraphicNode;
+import com.projectlibre1.pm.resource.Resource;
 import com.projectlibre1.pm.graphic.spreadsheet.common.CommonSpreadSheetModel;
 import com.projectlibre1.pm.graphic.spreadsheet.time.TimeSpreadSheetModel;
 import com.projectlibre1.datatype.Duration;
@@ -108,7 +110,7 @@ public class CellUtility {
 				component.setForeground(Color.GRAY);
 			}
 		}
-		markOverallocation(table,value,isSelected,row,column,component,model);
+		markOverallocation(table,value,isSelected,row,column,component,model,node);
 	}
 
 	/** Foreground for a period holding more work than its working time allows. */
@@ -120,14 +122,26 @@ public class CellUtility {
 	 * 40 hours for a weekly column on a standard calendar. Runs last because the colour handling
 	 * above resets the foreground and background of every cell.
 	 */
-	private static void markOverallocation(JTable table, Object value, boolean isSelected, int row, int column, JComponent component, CommonSpreadSheetModel model){
+	private static void markOverallocation(JTable table, Object value, boolean isSelected, int row, int column, JComponent component, CommonSpreadSheetModel model, GraphicNode node){
 		if (isSelected||!(value instanceof Duration)||!(model instanceof TimeSpreadSheetModel)) return;
+		if (!isSingleResourceRow(node)) return;
 		long available=((TimeSpreadSheetModel)model).getIntervalWorkingTime(table.convertColumnIndexToModel(column));
 		if (available<=0||((Duration)value).longValue()<=available) return;
 		component.setForeground(OVERALLOCATED_FOREGROUND);
 		component.setBackground(OVERALLOCATED_BACKGROUND);
 		component.setOpaque(true);
 		component.setFont(component.getFont().deriveFont(java.awt.Font.BOLD));
+	}
+
+	/**
+	 * Only a row standing for one person's time can be over-allocated: a resource row, or an
+	 * assignment of one resource to one task. A task or summary row sums every resource working on
+	 * it, so 16h in a day there is two people working a normal day, not an over-allocation.
+	 */
+	private static boolean isSingleResourceRow(GraphicNode node){
+		if (node==null||node.isVoid()||node.getNode()==null) return false;
+		Object impl=node.getNode().getImpl();
+		return (impl instanceof Resource)||(impl instanceof Assignment);
 	}
 
 	public static void setAppearance(CellFormat format, JComponent component){

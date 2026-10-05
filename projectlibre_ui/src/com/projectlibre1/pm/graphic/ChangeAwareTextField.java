@@ -97,6 +97,17 @@ public class ChangeAwareTextField extends JFormattedTextField implements Documen
 				if (e.getClickCount() == 2)
 					GraphicManager.getInstance(ChangeAwareTextField.this).doInformationDialog(false);
 			}
+			public void mouseReleased(MouseEvent e) {
+				// The table reposts the click that started editing to this field. The press lands on
+				// text the editor has just selected, so drag recognition consumes it and the caret
+				// only reacts on release: it fires a caret event and then moves to the click point,
+				// discarding whatever that event selected. Select once the release has been handled.
+				// the caret's own listener was installed before this one, so it has already moved
+				if (selectAllNextCaretUpdate && SwingUtilities.isLeftMouseButton(e)) {
+					selectAllNextCaretUpdate = false;
+					selectAll();
+				}
+			}
 		});
     	Keymap keymap = getKeymap();
         KeyStroke key = KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0, false);
@@ -148,15 +159,18 @@ public class ChangeAwareTextField extends JFormattedTextField implements Documen
 
 	}
 
+	/**
+	 * Select the whole text once the mouse click that started editing has been processed
+	 * (see the mouse listener installed by the constructor). A caret event alone is not a
+	 * usable trigger: the caret is repositioned after it fires, and when the click does not
+	 * move the caret no event arrives at all, leaving the request armed until the first typed
+	 * character, which then got selected and overwritten by the second one.
+	 */
 	public void selectAllOnNextCaretUpdate() {
 		selectAllNextCaretUpdate = true;
 	}
 
 	public void caretUpdate(CaretEvent e) {
-		if (selectAllNextCaretUpdate) {
-			selectAllNextCaretUpdate = false;
-			selectAll();
-		}
 	}
 
 	public boolean hasChanged() {
@@ -173,10 +187,12 @@ public class ChangeAwareTextField extends JFormattedTextField implements Documen
 
 	public void insertUpdate(DocumentEvent e) {
 		changed = true;
+		selectAllNextCaretUpdate = false; // never select text the user has just typed
 	}
 
 	public void removeUpdate(DocumentEvent e) {
 		changed = true;
+		selectAllNextCaretUpdate = false;
 	}
 
 	

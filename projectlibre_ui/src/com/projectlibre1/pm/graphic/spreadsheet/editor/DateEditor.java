@@ -102,6 +102,20 @@ public class DateEditor extends DateFieldTableEditor {
 					if (e.getClickCount() == 2)
 						GraphicManager.getInstance(ExtDateField.this).doInformationDialog(false);
 				}
+				public void mouseReleased(MouseEvent e) {
+					if (SwingUtilities.isLeftMouseButton(e))
+						selectAllIfPending();
+				}
+			});
+			getTextField().addFocusListener(new java.awt.event.FocusAdapter() {
+				public void focusGained(java.awt.event.FocusEvent e) {
+					selectAllLater(); // after JFormattedTextField has re-formatted
+				}
+			});
+			getTextField().addKeyListener(new java.awt.event.KeyAdapter() {
+				public void keyTyped(KeyEvent e) {
+					selectAllPending = false; // the user has typed: leave the text alone from now on
+				}
 			});
 			
 		}
@@ -122,15 +136,32 @@ public class DateEditor extends DateFieldTableEditor {
 		}
 		
 		public void selectAll(boolean keyboard) { // convenience method
-			if (keyboard) { // if user typed something
+			if (keyboard) {
+				selectAllPending = false;
 				getTextField().selectAll();
-			} else { // select later because popup drawing erases selection
-				//TODO there is currently a bug in that if the cell is the active cell and you click to edit, the next is not getting selected
-				SwingUtilities.invokeLater(new Runnable() {
-					public void run() {
-						getTextField().selectAll();
-					}});
+			} else {
+				// Editing was started by a click that the table still has to repost to the text field:
+				// the caret moves to the click point on release, and the formatted field re-formats its
+				// text when it gains focus. Select after each of those, as long as nothing was typed.
+				selectAllPending = true;
+				selectAllLater();
 			}
+		}
+
+		private boolean selectAllPending = false;
+
+		private void selectAllLater() {
+			SwingUtilities.invokeLater(new Runnable() {
+				public void run() {
+					selectAllIfPending();
+				}
+			});
+		}
+
+		private void selectAllIfPending() {
+			if (!selectAllPending)
+				return;
+			getTextField().selectAll();
 		}
 		public String toString() {
 			return getTextField().getText();

@@ -55,6 +55,7 @@
  *******************************************************************************/
 package com.projectlibre1.pm.graphic.spreadsheet.renderer;
 
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Font;
 
@@ -114,12 +115,19 @@ public class SpreadSheetRowHeaderRenderer extends DefaultTableCellRenderer  impl
 					rowSelected=spreadSheet.isRowSelected(row);
 			}
 
-			component.setForeground (table.getTableHeader().getForeground());
-			if (Environment.isNewLaf()||Environment.isMac())
-				component.setBackground(isSelected ? GraphicManager.getInstance().getLafManager().getSelectedBackgroundColor() : GraphicManager.getInstance().getLafManager().getUnselectedBackgroundColor());
-			else
-				component.setBackground(isSelected ? GraphicManager.getInstance().getLafManager().getSelectedBackgroundColor() : table.getTableHeader().getBackground());
-
+			if (rowSelected){
+				//fill the index with a dark shade of the table selection colour so the row stands out
+				Color selectionBackground=UIManager.getColor("Table.selectionBackground"); //$NON-NLS-1$
+				if (selectionBackground==null) selectionBackground=new Color(51,102,204);
+				component.setBackground(selectionBackground.darker().darker());
+				component.setForeground(Color.WHITE);
+			}else{
+				component.setForeground (table.getTableHeader().getForeground());
+				if (Environment.isNewLaf()||Environment.isMac())
+					component.setBackground(isSelected ? GraphicManager.getInstance().getLafManager().getSelectedBackgroundColor() : GraphicManager.getInstance().getLafManager().getUnselectedBackgroundColor());
+				else
+					component.setBackground(isSelected ? GraphicManager.getInstance().getLafManager().getSelectedBackgroundColor() : table.getTableHeader().getBackground());
+			}
 			Font headerFont=table.getTableHeader ().getFont();
 			component.setFont (rowSelected?boldVersionOf(headerFont):headerFont);
 		}

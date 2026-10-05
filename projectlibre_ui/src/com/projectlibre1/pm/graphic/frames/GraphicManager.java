@@ -1020,6 +1020,7 @@ public class GraphicManager implements  FrameHolder, NamedFrameListener, WindowS
 		actionsMap.addHandler(ACTION_DELEGATE_TASKS, new DelegateTasksAction());
 		actionsMap.addHandler(ACTION_UPDATE_TASKS, new UpdateTasksAction());
 		actionsMap.addHandler(ACTION_UPDATE_PROJECT, new UpdateProjectAction());
+		actionsMap.addHandler(ACTION_RECALCULATE, new RecalculateAction());
 		actionsMap.addHandler(ACTION_BAR, new BarAction());
 		actionsMap.addHandler(ACTION_INSERT_RECURRING, new RecurringTaskAction());
 		actionsMap.addHandler(ACTION_SORT, new SortAction());
@@ -2650,6 +2651,7 @@ protected boolean loadLocalDocument(String fileName,boolean merge){ //uses serve
 		    addCtrlAccel(KeyEvent.VK_Y, ACTION_REDO, null);
 		    addCtrlAccel(KeyEvent.VK_N, ACTION_NEW_PROJECT, null);
 		    addCtrlAccel(KeyEvent.VK_O, ACTION_OPEN_PROJECT, null);
+		    addAccel(KeyEvent.VK_F9, 0, ACTION_RECALCULATE); // F9 = calculate now, as in MS Project
 		    addCtrlAccel(KeyEvent.VK_S, ACTION_SAVE_PROJECT, null);
 		    addCtrlAccel(KeyEvent.VK_P, ACTION_PRINT, null);			//-Sanhita
 		    addCtrlAccel(KeyEvent.VK_I, ACTION_INSERT_TASK, null);
@@ -2664,6 +2666,14 @@ protected boolean loadLocalDocument(String fileName,boolean merge){ //uses serve
 			// To force a recalculation. This normally shouldn't be needed.
 		    addCtrlAccel(KeyEvent.VK_R, ACTION_RECALCULATE, new RecalculateAction());
     }
+
+    /** Binds a key with explicit modifiers (0 for none) to a menu action. */
+    private void addAccel(int vk, int modifiers, String actionConstant) {
+		RootPaneContainer root = (RootPaneContainer)container;
+		InputMap inputMap = root.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+		inputMap.put(KeyStroke.getKeyStroke(vk, modifiers), actionConstant);
+		root.getRootPane().getActionMap().put(actionConstant, menuManager.getActionFromId(actionConstant));
+	}
 
     private void addCtrlAccel(int vk, String actionConstant, Action action) {
 		RootPaneContainer root = (RootPaneContainer)container;

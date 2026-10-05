@@ -413,7 +413,7 @@ public class CommonSpreadSheet extends CommonTable implements CacheListener, Sav
         		comp=editorComp;
 
     		if (comp instanceof KeyboardFocusable)
-    			((KeyboardFocusable)comp).selectAll(e == null);
+    			((KeyboardFocusable)comp).selectAll(!(e instanceof MouseEvent)); //a click still has to be processed by the editor
 
     		else if (comp instanceof ChangeAwareTextField){
         		ChangeAwareTextField text=((ChangeAwareTextField)comp);

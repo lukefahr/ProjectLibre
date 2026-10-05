@@ -339,13 +339,13 @@ public class ReportAdapter {
 		while(iterator.hasNext()) {
 			Field field = (Field)iterator.next();
 			JRDesignStaticText staticText = new JRDesignStaticText();
-			staticText.setX(x);
+			staticText.setX(x + insetFor(field));
 			if(isSub) {
 				staticText.setY(20);
 			} else {
 				staticText.setY(5);
 			}
-			staticText.setWidth(field.getColumnWidth());
+			staticText.setWidth(field.getColumnWidth() - insetFor(field));
 			staticText.setHeight(15);
 			staticText.setForecolor(Color.white);
 			if(isSub) {
@@ -365,6 +365,17 @@ public class ReportAdapter {
 		return band;
 	}
 	
+	/**
+	 * Gap held at the left edge of a left aligned column. Without it the text starts hard against
+	 * the right aligned column before it, running the two together, e.g. "163DMEA/ITAR Tapeout".
+	 * Taken out of the column's own width so the columns after it do not move.
+	 */
+	private static final int LEFT_ALIGNED_INSET = 8;
+
+	private static int insetFor(Field field) {
+		return (alignmentFor(field) == JRTextElement.TEXT_ALIGN_LEFT) ? LEFT_ALIGNED_INSET : 0;
+	}
+
 	/** Task/resource names read far better flush left; every other column stays right aligned. */
 	private static byte alignmentFor(Field field) {
 		return "Field.name".equals(field.getId())
@@ -404,8 +415,8 @@ public class ReportAdapter {
 				textField.setFont(normalFont);
 				textField.setHeight(12);
 			}
-			textField.setX(x);
-			textField.setWidth(field.getColumnWidth());
+			textField.setX(x + insetFor(field));
+			textField.setWidth(field.getColumnWidth() - insetFor(field));
 			textField.setTextAlignment(alignmentFor(field));
 
 			String fieldName = getFieldName(field, false);
@@ -452,9 +463,9 @@ public class ReportAdapter {
 				band.addElement(line);
 
 				JRDesignTextField textField = new JRDesignTextField();
-				textField.setX(x);
+				textField.setX(x + insetFor(field));
 				textField.setY(4);
-				textField.setWidth(field.getColumnWidth());
+				textField.setWidth(field.getColumnWidth() - insetFor(field));
 				textField.setHeight(12);
 				textField.setTextAlignment(alignmentFor(field));
 				textField.setFont(normalFont);
