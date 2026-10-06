@@ -75,11 +75,21 @@ public abstract class GraphRenderer extends Renderer{
 
 	/**
 	 * A dependency is drawn as part of the critical path when the tasks at both of its ends are
-	 * critical, matching how critical bars themselves are coloured.
+	 * critical and the link is the one that actually drives the successor's start. A critical
+	 * task with several predecessors is only pushed by the latest of them; the other links have
+	 * slack of their own and are drawn normally.
 	 */
 	public static boolean isCriticalLink(GraphicDependency dependency){
 		if (dependency==null) return false;
-		return isCriticalNode(dependency.getPredecessor())&&isCriticalNode(dependency.getSuccessor());
+		if (!isCriticalNode(dependency.getPredecessor())||!isCriticalNode(dependency.getSuccessor())) return false;
+		com.projectlibre1.pm.dependency.Dependency link=dependency.getDependency();
+		Object successor=dependency.getSuccessor().getNode().getImpl();
+		if (link==null||!(successor instanceof Task)) return true;
+		com.projectlibre1.pm.criticalpath.TaskSchedule schedule=((Task)successor).getCurrentSchedule();
+		if (schedule==null) return true;
+		long drivingDate=schedule.getDependencyDate();
+		if (drivingDate==0||drivingDate==com.projectlibre1.pm.dependency.Dependency.NEEDS_CALCULATION) return true;
+		return link.getDate(true)==drivingDate;
 	}
 	private static boolean isCriticalNode(GraphicNode node){
 		if (node==null||node.getNode()==null) return false;
