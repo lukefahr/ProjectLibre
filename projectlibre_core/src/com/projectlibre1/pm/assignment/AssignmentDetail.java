@@ -763,11 +763,11 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
 		WorkCalendar cal = getEffectiveWorkCalendar();
 		long finish = cal.add(getStart(),getDuration(),true);
 		if (getPercentComplete() > 0.0 && getPercentComplete() < 1.0) {
-			long dependencyStart = getDependencyStart();
-			if (dependencyStart > getTaskStart()) {
-				long splitDuration  = cal.compare(dependencyStart,getTaskStart(),false);
+			// the gap runs from where the completed work stops to where the predecessors let the
+			// remaining work resume, not from the task start (that counted the completed work twice)
+			long splitDuration = getSplitDuration();
+			if (splitDuration > 0)
 				finish = cal.add(finish,splitDuration,true);
-			}
 		}
 		return finish;
 	}

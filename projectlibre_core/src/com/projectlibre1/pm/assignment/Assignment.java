@@ -648,12 +648,15 @@ public final class Assignment implements Schedule, Association, Allocation, Dela
 			start = computeStart(startDate,dependencyDate);
 		else
 			start = startDate;
-		if (getPercentComplete() > 0)
+		if (getPercentComplete() > 0) {
 			start=getEffectiveWorkCalendar().add(start,getActualDuration(),useSooner);
-
-
-		long duration = remainingOnly ? detail.getRemainingDuration() : detail.getDuration();// + this.detail.getSplitDuration();
-//TODO integrate split - still needed?
+			// Work that has started can still be held up: the remaining work cannot resume before
+			// the date the predecessors allow, which splits the task. The bars are drawn this way
+			// (see AssignmentDetail.getResume) and the finish must follow the same rule.
+			if (ahead && startDate > 0 && getPercentComplete() < 1.0 && dependencyDate > start)
+				start = dependencyDate;
+		}
+		long duration = remainingOnly ? detail.getRemainingDuration() : detail.getDuration();
 
 		long amount = (ahead ? duration : -duration);
 		return  getEffectiveWorkCalendar().add(start,amount, useSooner);
