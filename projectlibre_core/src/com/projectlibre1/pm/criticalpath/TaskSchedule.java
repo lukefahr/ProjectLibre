@@ -67,6 +67,7 @@ import org.apache.commons.lang.builder.ToStringBuilder;
 import com.projectlibre1.datatype.Duration;
 import com.projectlibre1.grouping.core.Node;
 import com.projectlibre1.pm.dependency.Dependency;
+import com.projectlibre1.pm.dependency.HasDependencies;
 import com.projectlibre1.pm.task.NormalTask;
 import com.projectlibre1.pm.task.SubProj;
 import com.projectlibre1.pm.task.Task;
@@ -441,9 +442,20 @@ public final class TaskSchedule implements Cloneable {
 				long dep = newBegin; // by default (if no preds for example)
 				if (dependencyCount > 0) {
 					boolean useSooner = !dependencyTask.isWbsParent() && dependencyTask.hasDuration();
-					dep = dependency.calcDependencyDate(forward,newBegin,newEnd,useSooner); // calculate it and store off value
-					if (dependencyCount > 1) // can't just set date directly because more than one
-						dep = needsCalculation; // it will need to be calculated later
+					TaskSchedule early;
+					if (forward && yieldsToSuccessor(dependency)) {
+						dep = needsCalculation; // the successor leaves this link out when it recalculates
+					} else if (!forward && yieldsToSuccessor(dependency) && (early = task.getSchedule(EARLY)).getEnd() != 0) {
+						// bound the as-late-as-possible predecessor by this task's early dates, not its late ones,
+						// so that it is scheduled as late as possible without delaying this higher priority task
+						dep = dependency.calcDependencyDate(forward,-early.getEnd(),-early.getBegin(),useSooner);
+						if (dependencyCount > 1)
+							dep = needsCalculation;
+					} else {
+						dep = dependency.calcDependencyDate(forward,newBegin,newEnd,useSooner); // calculate it and store off value
+						if (dependencyCount > 1) // can't just set date directly because more than one
+							dep = needsCalculation; // it will need to be calculated later
+					}
 				}
 				dependencyTaskSchedule.setDependencyDate(dep);
 				dependencyTask.setCalculationStateCount(context.stateCount); // need to process successor(predecessor) later on in pass
@@ -545,6 +557,28 @@ public final class TaskSchedule implements Cloneable {
 		setRawDuration(duration);
 	}	
 	
+	private static final int DEFAULT_PRIORITY = 500;
+
+	private static int priorityOf(Task task) {
+		return task instanceof NormalTask ? ((NormalTask) task).getPriority() : DEFAULT_PRIORITY;
+	}
+
+	/**
+	 * An as-late-as-possible task yields to a higher priority successor that is scheduled as
+	 * soon as possible: the successor is not pushed out by the link, and the predecessor is
+	 * scheduled as late as the successor's early dates allow instead of its late dates.
+	 */
+	static boolean yieldsToSuccessor(Dependency dependency) {
+		HasDependencies p = dependency.getPredecessor();
+		HasDependencies s = dependency.getSuccessor();
+		if (!(p instanceof Task) || !(s instanceof Task))
+			return false;
+		Task predecessor = (Task) p;
+		Task successor = (Task) s;
+		return predecessor.isReverseScheduled() && !successor.isReverseScheduled()
+			&& priorityOf(predecessor) < priorityOf(successor);
+	}
+
 /**
  * Calculate the date which predecessors(successors) push this task to start by looping thru all of its predecesors(succ) and choosing the max value
  * @return max date
@@ -558,6 +592,8 @@ public final class TaskSchedule implements Cloneable {
 			dependency = (Dependency) i.next();
 			if (dependency.isDisabled())
 				continue;
+			if (forward && yieldsToSuccessor(dependency))
+				continue; // the higher priority successor is not pushed by its as-late-as-possible predecessor
 			current = dependency.getDate(forward);
 			if (result == 0)
 				result = current;
