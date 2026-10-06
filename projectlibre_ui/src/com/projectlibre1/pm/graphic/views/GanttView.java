@@ -462,6 +462,14 @@ public class GanttView extends SplittedView implements BaseView, ScheduleEventLi
 	public boolean canScrollToTask() {
 		return true;
 	}
+	/** Brings the current date into view, once the chart has been laid out. */
+	public void scrollToToday() {
+		javax.swing.SwingUtilities.invokeLater(new Runnable() {
+			public void run() {
+				if (gantt!=null) gantt.scrollToDate(System.currentTimeMillis());
+			}
+		});
+	}
 	public void scrollToTask() {
 		List impls=spreadSheet.getSelectedNodesImpl();
 		if (impls.size()==0) return;

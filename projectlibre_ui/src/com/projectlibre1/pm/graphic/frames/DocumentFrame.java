@@ -563,6 +563,7 @@ public class DocumentFrame extends NamedFrame implements
 			ganttView = new GanttView(this, graphicManager.getMenuManager(),mainView.getSynchronizer());
 			ganttView.init(getTaskNodeModelCache(), getTaskModel(), coord);
 			restoreWorkspaceFor(ganttView);
+			ganttView.scrollToToday(); // open on the current date rather than wherever the file was last scrolled
 		}
 		return ganttView;
 	}

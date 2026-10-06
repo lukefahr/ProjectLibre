@@ -260,6 +260,40 @@ public class Gantt extends Graph implements ScaledComponent, TimeScaleListener, 
 		}
 		//scrollRectToVisible(visible);
 	}
+	private long pendingScrollDate=0;
+	/**
+	 * Scrolls so that the given date sits about a quarter of the way into the visible part of
+	 * the chart. Dates outside the timescale are ignored. If the chart has not been laid out
+	 * yet the scroll is done once it has a size.
+	 */
+	public void scrollToDate(final long date){
+		CoordinatesConverter coord=getCoord();
+		if (coord==null||date<coord.getOrigin()||date>coord.getEnd()) return;
+		Component c=getParent();
+		if (!(c instanceof JViewport)) return;
+		final JViewport vp=(JViewport)c;
+		if (vp.getExtentSize().width<=0){
+			if (pendingScrollDate==0){
+				vp.addComponentListener(new java.awt.event.ComponentAdapter(){
+					public void componentResized(java.awt.event.ComponentEvent e){
+						if (pendingScrollDate!=0&&vp.getExtentSize().width>0){
+							long d=pendingScrollDate;
+							pendingScrollDate=0;
+							vp.removeComponentListener(this);
+							scrollToDate(d);
+						}
+					}
+				});
+			}
+			pendingScrollDate=date;
+			return;
+		}
+		Point p=vp.getViewPosition();
+		int x=(int)Math.round(coord.toX(date))-vp.getExtentSize().width/4;
+		int max=Math.max(0,vp.getViewSize().width-vp.getExtentSize().width);
+		p.x=Math.max(0,Math.min(x,max));
+		vp.setViewPosition(p);
+	}
 	public boolean isLeftPartVisible() {
 		return true;
 	}
