@@ -69,6 +69,7 @@ import com.projectlibre1.grouping.core.Node;
 import com.projectlibre1.pm.dependency.Dependency;
 import com.projectlibre1.pm.dependency.HasDependencies;
 import com.projectlibre1.pm.task.NormalTask;
+import com.projectlibre1.pm.task.Project;
 import com.projectlibre1.pm.task.SubProj;
 import com.projectlibre1.pm.task.Task;
 
@@ -575,8 +576,18 @@ public final class TaskSchedule implements Cloneable {
 			return false;
 		Task predecessor = (Task) p;
 		Task successor = (Task) s;
+		if (isSentinel(predecessor) || isSentinel(successor))
+			return false; // the project start and finish always see every task
 		return predecessor.isReverseScheduled() && !successor.isReverseScheduled()
 			&& priorityOf(predecessor) < priorityOf(successor);
+	}
+
+	private static boolean isSentinel(Task task) {
+		Project project = task.getOwningProject();
+		if (project == null)
+			return false;
+		SchedulingAlgorithm algorithm = project.getSchedulingAlgorithm();
+		return algorithm instanceof CriticalPath && ((CriticalPath) algorithm).isSentinel(task);
 	}
 
 /**

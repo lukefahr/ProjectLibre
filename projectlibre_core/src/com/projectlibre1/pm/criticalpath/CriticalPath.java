@@ -613,7 +613,8 @@ public class CriticalPath implements SchedulingAlgorithm {
 	public final long getLatestFinish() {
 		return latestFinish;
 	}
-	private boolean isSentinel(Task task) {
+	/** The start and finish sentinels bracket the project; they are not real tasks. */
+	public boolean isSentinel(Task task) {
 		return task == startSentinel || task == finishSentinel;
 	}
 	public final Project getProject() {
