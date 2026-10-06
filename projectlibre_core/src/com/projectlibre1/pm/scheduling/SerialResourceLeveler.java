@@ -212,39 +212,94 @@ public class SerialResourceLeveler {
 		all.addAll(candidates);
 		int overloadedDaysBefore = countOverloadedDays(all, null);
 
+		Map<Task, Move> moves = new HashMap<Task, Move>();
+		Set<Task> unresolved = new LinkedHashSet<Task>();
+		Set<Task> held = new LinkedHashSet<Task>();
+
 		// Within slack only: a task that cannot be resolved stays put, and the tasks placed
 		// before it did not know that. Hold such tasks in place and place the rest again,
 		// until no new one turns up.
-		Set<Task> held = new HashSet<Task>();
-		Result result;
 		for (int round = 0;; round++) {
 			List<Task> toPlace = new ArrayList<Task>(candidates);
 			toPlace.removeAll(held);
 			List<Task> inPlace = new ArrayList<Task>(fixed);
 			inPlace.addAll(held);
-			for (Task task : toPlace)
-				task.setLevelingDelay(0);
-			if (round > 0)
-				project.recalculate();
-			result = place(toPlace, inPlace, slackBefore);
-			if (!withinSlackOnly || result.heldForSlack.isEmpty() || round >= 8)
+			Result pass = place(toPlace, inPlace, slackBefore, round > 0);
+			record(pass, moves, unresolved);
+			if (!withinSlackOnly || pass.heldForSlack.isEmpty() || round >= 8)
 				break;
-			held.addAll(result.heldForSlack);
+			held.addAll(pass.heldForSlack);
 		}
+
+		// A task accepted earlier can still be moved by a later delay (as-late-as-possible
+		// tasks follow their successors, summaries pull their children, constraints shift).
+		// Re-place whatever ended up over-allocated anyway, against everything else as it
+		// now stands, and flag what is left.
+		for (int round = 0; round < 5; round++) {
+			Set<Task> conflicting = overloadedTasks(all);
+			conflicting.retainAll(candidates);
+			conflicting.removeAll(held);
+			if (conflicting.isEmpty())
+				break;
+			List<Task> toPlace = new ArrayList<Task>(conflicting);
+			List<Task> inPlace = new ArrayList<Task>(all);
+			inPlace.removeAll(conflicting);
+			Result pass = place(toPlace, inPlace, slackBefore, true);
+			record(pass, moves, unresolved);
+			held.addAll(pass.heldForSlack);
+		}
+		Set<Task> leftover = overloadedTasks(all);
+		leftover.retainAll(candidates);
+		leftover.removeAll(held);
+		unresolved.addAll(leftover);
+
+		Result result = new Result();
 		result.candidates = candidates.size();
 		result.fixed = fixed.size();
-		result.unresolved += held.size();
+		List<Task> moved = new ArrayList<Task>(moves.keySet());
+		java.util.Collections.sort(moved, new java.util.Comparator<Task>() {
+			public int compare(Task a, Task b) {
+				return a.getId() < b.getId() ? -1 : a.getId() == b.getId() ? 0 : 1;
+			}
+		});
+		for (Task task : moved) {
+			Move move = moves.get(task);
+			result.moves.add(move);
+			result.delayed++;
+			result.totalDelay += move.delay;
+			result.details.add(task.getId() + " " + task.getName() + ": +" + (move.delay / (double) WorkCalendar.MILLIS_IN_HOUR) + "h" + (move.resolved ? "" : " (unresolved)"));
+		}
 		for (Task task : held)
 			result.details.add(task.getId() + " " + task.getName() + ": not moved (would exceed slack)");
+		for (Task task : leftover)
+			result.details.add(task.getId() + " " + task.getName() + ": still over-allocated after leveling");
+		unresolved.addAll(held);
+		result.unresolved = unresolved.size();
 		result.overloadedDaysBefore = overloadedDaysBefore;
 		result.overloadedDaysAfter = countOverloadedDays(all, result.remaining);
 		return result;
 	}
 
+	/** Folds one pass into the running picture: a re-placed task replaces its earlier move. */
+	private static void record(Result pass, Map<Task, Move> moves, Set<Task> unresolved) {
+		for (Move move : pass.moves) {
+			moves.put(move.task, move);
+			if (move.resolved)
+				unresolved.remove(move.task);
+			else
+				unresolved.add(move.task);
+		}
+	}
+
 	/** One serial pass: places {@code candidates} against {@code fixed}, which never move. */
-	private Result place(List<Task> candidates, List<Task> fixed, Map<Task, Long> slackBefore) {
+	private Result place(List<Task> candidates, List<Task> fixed, Map<Task, Long> slackBefore, boolean resetFirst) {
 		Result result = new Result();
 		List<Task> heldForSlack = result.heldForSlack;
+		if (resetFirst) {
+			for (Task task : candidates)
+				task.setLevelingDelay(0);
+			project.recalculate();
+		}
 		load.clear();
 		counted.clear();
 		for (Task task : fixed)
@@ -289,12 +344,8 @@ public class SerialResourceLeveler {
 				result.unresolved++;
 			if (!placed && delay == 0)
 				heldForSlack.add(task);
-			if (delay > 0) {
-				result.delayed++;
-				result.totalDelay += delay;
+			if (delay > 0)
 				result.moves.add(new Move(task, oldStart, task.getStart(), delay, placed));
-				result.details.add(task.getId() + " " + task.getName() + ": +" + (delay / (double) WorkCalendar.MILLIS_IN_HOUR) + "h" + (placed ? "" : " (unresolved)"));
-			}
 			addToLoad(task);
 		}
 		return result;
@@ -357,7 +408,7 @@ public class SerialResourceLeveler {
 		boolean bestReady = false;
 		for (Task task : unplaced) {
 			boolean ready = true;
-			for (Task predecessor : effectivePredecessors(task)) {
+			for (Task predecessor : prerequisites(task)) {
 				if (unplaced.contains(predecessor)) {
 					ready = false;
 					break;
@@ -371,7 +422,10 @@ public class SerialResourceLeveler {
 		return best;
 	}
 
-	private static boolean comesBefore(Task a, Task b) {
+	private boolean comesBefore(Task a, Task b) {
+		int ea = effectivePriority(a), eb = effectivePriority(b);
+		if (ea != eb)
+			return ea > eb;
 		int pa = priority(a), pb = priority(b);
 		if (pa != pb)
 			return pa > pb;
@@ -380,26 +434,71 @@ public class SerialResourceLeveler {
 		return a.getId() < b.getId();
 	}
 
+	/**
+	 * Leaf tasks whose placement decides where this task can go: its predecessors and those
+	 * of its ancestors, and for a task scheduled as late as possible also its successors,
+	 * since its start follows them.
+	 */
+	private Set<Task> prerequisites(Task task) {
+		Set<Task> result = new HashSet<Task>(effectivePredecessors(task));
+		if (task.isReverseScheduled())
+			result.addAll(effectiveSuccessors(task));
+		result.remove(task);
+		return result;
+	}
+
 	/** Leaf tasks that drive this task's start: its own predecessors and those of its ancestors. */
 	private Set<Task> effectivePredecessors(Task task) {
-		Set<Task> result = predecessorCache.get(task);
+		return linkedLeaves(task, true, predecessorCache);
+	}
+
+	/** Leaf tasks that follow this task: its own successors and those of its ancestors. */
+	private Set<Task> effectiveSuccessors(Task task) {
+		return linkedLeaves(task, false, successorCache);
+	}
+
+	private final Map<Task, Set<Task>> successorCache = new HashMap<Task, Set<Task>>();
+
+	private static Set<Task> linkedLeaves(Task task, boolean predecessors, Map<Task, Set<Task>> cache) {
+		Set<Task> result = cache.get(task);
 		if (result != null)
 			return result;
 		result = new HashSet<Task>();
 		for (Task t = task; t != null; t = t.getWbsParentTask()) {
-			for (Iterator i = t.getPredecessorList().iterator(); i.hasNext();) {
+			for (Iterator i = (predecessors ? t.getPredecessorList() : t.getSuccessorList()).iterator(); i.hasNext();) {
 				Dependency dependency = (Dependency) i.next();
 				if (dependency.isDisabled())
 					continue;
-				HasDependencies predecessor = dependency.getPredecessor();
-				if (predecessor instanceof Task)
-					addLeaves((Task) predecessor, result);
+				HasDependencies other = predecessors ? dependency.getPredecessor() : dependency.getSuccessor();
+				if (other instanceof Task)
+					addLeaves((Task) other, result);
 			}
 		}
 		result.remove(task);
-		predecessorCache.put(task, result);
+		cache.put(task, result);
 		return result;
 	}
+
+	/**
+	 * A task is as urgent as the most urgent task that waits for it, so that a high priority
+	 * task can win a contested resource through its predecessors as well.
+	 */
+	private int effectivePriority(Task task) {
+		Integer cached = effectivePriorityCache.get(task);
+		if (cached != null)
+			return cached;
+		if (!priorityVisiting.add(task))
+			return priority(task); // dependency cycle: fall back to the task's own priority
+		int result = priority(task);
+		for (Task successor : effectiveSuccessors(task))
+			result = Math.max(result, effectivePriority(successor));
+		priorityVisiting.remove(task);
+		effectivePriorityCache.put(task, result);
+		return result;
+	}
+
+	private final Map<Task, Integer> effectivePriorityCache = new HashMap<Task, Integer>();
+	private final Set<Task> priorityVisiting = new HashSet<Task>();
 
 	private static void addLeaves(Task task, Set<Task> into) {
 		if (!task.isWbsParent()) {
@@ -493,13 +592,23 @@ public class SerialResourceLeveler {
 		return contribution;
 	}
 
-	/**
-	 * Resource-days on which the given tasks together exceed the resource capacity. When
-	 * {@code report} is given, one line per such day is added naming the tasks involved.
-	 */
-	private int countOverloadedDays(Collection<Task> tasks, List<String> report) {
+	/** Tasks taking part in any over-allocated resource-day among the given tasks (scoped resources only). */
+	private Set<Task> overloadedTasks(Collection<Task> tasks) {
 		Map<Resource, Map<Long, Long>> total = new HashMap<Resource, Map<Long, Long>>();
 		Map<Resource, Map<Long, List<Task>>> contributors = new HashMap<Resource, Map<Long, List<Task>>>();
+		accumulate(tasks, total, contributors);
+		Set<Task> result = new LinkedHashSet<Task>();
+		for (Map.Entry<Resource, Map<Long, Long>> byResource : total.entrySet()) {
+			if (!inScope(byResource.getKey()))
+				continue;
+			for (Map.Entry<Long, Long> byDay : byResource.getValue().entrySet())
+				if (byDay.getValue() > capacityOn(byResource.getKey(), byDay.getKey()) + TOLERANCE)
+					result.addAll(contributors.get(byResource.getKey()).get(byDay.getKey()));
+		}
+		return result;
+	}
+
+	private void accumulate(Collection<Task> tasks, Map<Resource, Map<Long, Long>> total, Map<Resource, Map<Long, List<Task>>> contributors) {
 		for (Task task : tasks) {
 			for (Map.Entry<Resource, Map<Long, Long>> byResource : contributionOf(task).daily.entrySet()) {
 				Map<Long, Long> days = total.get(byResource.getKey());
@@ -522,6 +631,16 @@ public class SerialResourceLeveler {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Resource-days on which the given tasks together exceed the resource capacity. When
+	 * {@code report} is given, one line per such day is added naming the tasks involved.
+	 */
+	private int countOverloadedDays(Collection<Task> tasks, List<String> report) {
+		Map<Resource, Map<Long, Long>> total = new HashMap<Resource, Map<Long, Long>>();
+		Map<Resource, Map<Long, List<Task>>> contributors = new HashMap<Resource, Map<Long, List<Task>>>();
+		accumulate(tasks, total, contributors);
 		int overloaded = 0;
 		java.text.DateFormat dateFormat = java.text.DateFormat.getDateInstance(java.text.DateFormat.SHORT);
 		for (Map.Entry<Resource, Map<Long, Long>> byResource : total.entrySet()) {
