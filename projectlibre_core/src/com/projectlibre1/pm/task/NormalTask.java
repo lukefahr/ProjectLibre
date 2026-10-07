@@ -251,18 +251,18 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 				duration = 0;
 			}
 		} else {
-			AssociationList assignments =getAssignments();
+						AssociationList assignments =getAssignments();
 			if (assignments.size() == 1) {
-				duration = ((Assignment)assignments.getFirst()).getDurationMillis();
+				duration = ((Assignment)assignments.getFirst()).getWorkingDurationMillis(); // split gaps are not duration
 			} else {
 				Iterator i = assignments.iterator();
-				long end = 0;
-				// get the latest ending assignment
+				duration = 0;
+				// the latest ending assignment decides, measured from the task start and without its split gaps
 				while (i.hasNext()) {
-					end = Math.max(end,((Assignment)i.next()).getEnd());
+					Assignment assignment = (Assignment)i.next();
+					long d = getEffectiveWorkCalendar().compare(assignment.getEnd(),getStart(),false) - assignment.getFillerDuration();
+					duration = Math.max(duration, d);
 				}
-				// duration is calendar time between assignment end and task start
-				duration = getEffectiveWorkCalendar().compare(end,getStart(),false);
 			}
 		}
 		duration = Duration.setAsEstimated(duration,estimated);
@@ -1094,12 +1094,43 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 	public boolean isReadOnlyUnits(FieldContext fieldContext) {
 		return true;
 	}
-	public long getCompletedThrough() {
+		public long getCompletedThrough() {
 		long start = getStart();
 		if (start == 0)
 			return 0;
+		if (!isWbsParent())
+			return stopForPercentComplete(getPercentComplete());
 		long actualDuration = DateTime.closestDate(getDurationMillis() * getPercentComplete());
 		return getEffectiveWorkCalendar().add(start,actualDuration,true);
+	}
+
+	/** Working time within the first {@code spanOffset} of the task, split gaps excluded. */
+	long workingTimeBefore(long spanOffset) {
+		long result = spanOffset;
+		for (Iterator i = getAssignments().iterator(); i.hasNext();) {
+			Assignment assignment = (Assignment)i.next();
+			result = Math.min(result, spanOffset - Math.min(assignment.getFillerDuration(), spanOffset));
+		}
+		return Math.max(0, result);
+	}
+
+	/**
+	 * Date reached when the given fraction of this task's working time is done. Split gaps in
+	 * the work profile are skipped, so for a split task this is later than start plus fraction
+	 * of duration. The longest assignment decides.
+	 */
+	long stopForPercentComplete(double percentComplete) {
+		Assignment longest = null;
+		for (Iterator i = getAssignments().iterator(); i.hasNext();) {
+			Assignment assignment = (Assignment)i.next();
+			if (longest == null || assignment.getWorkingDurationMillis() > longest.getWorkingDurationMillis())
+				longest = assignment;
+		}
+		if (longest == null) {
+			long actualDuration = DateTime.closestDate(getDurationMillis() * percentComplete);
+			return getEffectiveWorkCalendar().add(getStart(), actualDuration, false);
+		}
+		return longest.getStopForPercentComplete(percentComplete);
 	}
 
 
@@ -1219,9 +1250,9 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 		} else {
 			long duration = getEffectiveWorkCalendar().compare(stop,
 					start, false);
-			duration = Math.min(duration, getDurationMillis()); // don't ever
+						duration = Math.min(duration, getDurationMillis()); // don't ever
 																// change finish
-			setActualDuration(duration);
+			setActualDuration(workingTimeBefore(duration));
 		}
 //		scheduleWindow.setStop(stop);
 	}
@@ -1628,10 +1659,15 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 			while (i.hasNext()) {
 				((Assignment)i.next()).setPercentComplete(pc);
 			}
-		} else {
-			long actualDuration = DateTime.closestDate(getDurationMillis() * percentComplete);
-			setActualDuration(actualDuration);
-			long stop = getEffectiveWorkCalendar().add(getStart(), actualDuration, false);
+				} else {
+			long stop;
+			if (isWbsParent()) {
+				long actualDuration = DateTime.closestDate(getDurationMillis() * percentComplete);
+				setActualDuration(actualDuration);
+				stop = getEffectiveWorkCalendar().add(getStart(), actualDuration, false);
+			} else {
+				stop = stopForPercentComplete(percentComplete); // percent complete counts working time, not split gaps
+			}
 			DeepChildWalker.recursivelyTreatBranch(getProject().getTaskOutline(),
 					this, new NumberClosure(stop) {
 						public void execute(Object arg0) {

@@ -119,6 +119,7 @@ import com.projectlibre1.pm.assignment.timesheet.TimesheetHelper;
 import com.projectlibre1.pm.assignment.timesheet.TimesheetStatus;
 import com.projectlibre1.pm.assignment.timesheet.UpdatesFromTimesheet;
 import com.projectlibre1.pm.calendar.WorkCalendar;
+import com.projectlibre1.util.DateTime;
 import com.projectlibre1.pm.costing.Accrual;
 import com.projectlibre1.pm.costing.EarnedValueCalculator;
 import com.projectlibre1.pm.costing.EarnedValueFields;
@@ -351,8 +352,25 @@ public final class Assignment implements Schedule, Association, Allocation, Dela
 	/**
 	 * @return Returns the duration.
 	 */
+		/** Length of the work profile including split gaps; the layout and the contour math use this. */
 	public long getDurationMillis() {
 		return detail.getDuration();
+	}
+
+	/** Duration as shown: the profile length without split gaps. */
+	public long getWorkingDurationMillis() {
+		return detail.getWorkingDuration();
+	}
+
+	/** Split gaps in the profile. */
+	public long getFillerDuration() {
+		return detail.getFillerDuration();
+	}
+
+	/** Date reached when the given fraction of the working time is done, skipping split gaps. */
+	public long getStopForPercentComplete(double percentComplete) {
+		long working = DateTime.closestDate(detail.getWorkingDuration() * percentComplete);
+		return getEffectiveWorkCalendar().add(getStart(), detail.workingToSpan(working), false);
 	}
 
 	private void setDurationMillis(long durationMillis) {
@@ -648,15 +666,15 @@ public final class Assignment implements Schedule, Association, Allocation, Dela
 			start = computeStart(startDate,dependencyDate);
 		else
 			start = startDate;
-		if (getPercentComplete() > 0) {
-			start=getEffectiveWorkCalendar().add(start,getActualDuration(),useSooner);
+				if (getPercentComplete() > 0) {
+			start=getEffectiveWorkCalendar().add(start,detail.getActualSpan(),useSooner); // past the work done and any gaps before the stop
 			// Work that has started can still be held up: the remaining work cannot resume before
 			// the date the predecessors allow, which splits the task. The bars are drawn this way
 			// (see AssignmentDetail.getResume) and the finish must follow the same rule.
 			if (ahead && startDate > 0 && getPercentComplete() < 1.0 && dependencyDate > start)
 				start = dependencyDate;
 		}
-		long duration = remainingOnly ? detail.getRemainingDuration() : detail.getDuration();
+				long duration = remainingOnly ? detail.getRemainingSpan() : detail.getDuration(); // profile lengths, gaps included
 
 		long amount = (ahead ? duration : -duration);
 		return  getEffectiveWorkCalendar().add(start,amount, useSooner);
@@ -1952,8 +1970,8 @@ public final class Assignment implements Schedule, Association, Allocation, Dela
 	public long getElapsedDuration() {
 		return detail.getElapsedDuration();
 	}
-	public long getDuration() {
-		return detail.getDuration();
+		public long getDuration() {
+		return detail.getWorkingDuration(); // split gaps are not duration
 	}
 	public double getPercentComplete() {
 		return detail.getPercentComplete();

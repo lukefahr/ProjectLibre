@@ -1174,8 +1174,13 @@ public abstract class Task implements HasKey, HasNotes, HasCalendar, HasDependen
 	/**
 	 * @param actualDuration
 	 */
-	public void setActualDuration(long actualDuration) {
+		public void setActualDuration(long actualDuration) {
 		actualDuration = DateTime.closestDate(Duration.millis(actualDuration));
+		if (!isWbsParent() && getDurationMillis() > 0 && this instanceof NormalTask) {
+			// durations exclude split gaps, so go through percent complete, which maps around them
+			setPercentComplete(((double)actualDuration) / getDurationMillis());
+			return;
+		}
 
 		if (actualDuration == Duration.millis(getActualDuration()))
 			return;

@@ -144,8 +144,70 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
 	/**
 	 * @return Returns the duration.
 	 */
-	public long getDuration() {
+		public long getDuration() {
 		return duration;
+	}
+
+	/** Time in the profile that carries no work: split gaps inserted by hand or by a dependency. */
+	long getFillerDuration() {
+		if (workContour == null || !workContour.isPersonal())
+			return 0;
+		return Math.max(0, duration - workContour.calcWorkingBucketDuration(duration));
+	}
+
+	/** The duration without split gaps, which is what is shown and what percent complete refers to. */
+	public long getWorkingDuration() {
+		return duration - getFillerDuration();
+	}
+
+	/** Profile offset, gaps included, at which the given amount of working time has been spent. */
+	long workingToSpan(long working) {
+		if (working <= 0)
+			return 0;
+		if (workContour == null || !workContour.isPersonal())
+			return Math.min(working, duration);
+		long span = 0;
+		long remaining = working;
+		AbstractContourBucket[] buckets = workContour.getContourBuckets();
+		for (int i = 0; i < buckets.length && remaining > 0; i++) {
+			long bucketDuration = buckets[i].getBucketDuration(duration);
+			if (buckets[i].getUnits() == 0.0) { // a gap on the way to the work still to do
+				span += bucketDuration;
+				continue;
+			}
+			long take = Math.min(bucketDuration, remaining);
+			span += take;
+			remaining -= take;
+		}
+		return span + remaining;
+	}
+
+	/** Working time spent within the first {@code span} of the profile, gaps excluded. */
+	long spanToWorking(long span) {
+		if (span <= 0)
+			return 0;
+		if (workContour == null || !workContour.isPersonal())
+			return Math.min(span, duration);
+		long working = 0;
+		long left = span;
+		AbstractContourBucket[] buckets = workContour.getContourBuckets();
+		for (int i = 0; i < buckets.length && left > 0; i++) {
+			long take = Math.min(buckets[i].getBucketDuration(duration), left);
+			if (buckets[i].getUnits() != 0.0)
+				working += take;
+			left -= take;
+		}
+		return working + Math.max(0, left);
+	}
+
+	/** Profile offset of the stop date: the completed working time plus the gaps before it. */
+	long getActualSpan() {
+		return workingToSpan(getActualDuration());
+	}
+
+	/** What is left of the profile after the stop date, gaps included. */
+	long getRemainingSpan() {
+		return Math.max(0, duration - getActualSpan());
 	}
 	
 	void recalculateDuration() {
@@ -315,13 +377,23 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
 			newRemainingDuration = 0; // just in case
 		if (getUnits() == 0) // take care of degenerate case
 			newRemainingDuration = 0;
-
-		long actualDuration = getActualDuration();
-		long d = newRemainingDuration + actualDuration;
+		long actualDuration = getActualDuration(); // working time done
+		long actualSpan = getActualSpan();
 		if (actualDuration > 0 && !workContour.isPersonal()) // because the remaining might not have same contour
 			workContour = PersonalContour.makePersonal(workContour,getDuration()); //use previous duration
-		workContour = workContour.adjustDuration(d, actualDuration); // allow a personal contour to adjust itself
-		d = workContour.calcTotalBucketDuration(d); // it is possible that the contour is shorter because we have eliminated a bucket at the end which is after empty time.  The empty time must be removed too
+		// durations exclude split gaps: change the profile by the change in working time and keep the gaps
+		long targetWorking = newRemainingDuration + actualDuration;
+		long d = duration + (targetWorking - getWorkingDuration());
+		for (int attempt = 0; attempt < 6; attempt++) {
+			workContour = workContour.adjustDuration(d, actualSpan); // allow a personal contour to adjust itself
+			d = workContour.calcTotalBucketDuration(d); // it is possible that the contour is shorter because we have eliminated a bucket at the end which is after empty time.  The empty time must be removed too
+			if (!workContour.isPersonal())
+				break;
+			long shortfall = targetWorking - workContour.calcWorkingBucketDuration(d);
+			if (shortfall == 0)
+				break;
+			d += shortfall; // a gap was cut away with the end: put the working time back
+		}
 		setDuration(d);
 	}
 
@@ -820,15 +892,16 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
 	/**
 	 * @return Returns the actualDuration.
 	 */
-	public long getActualDuration() {
-		return  DateTime.closestDate(getDuration() * getPercentComplete());
+		public long getActualDuration() {
+		return  DateTime.closestDate(getWorkingDuration() * getPercentComplete());
 	}
 	/**
 	 * @param actualDuration The actualDuration to set. Will fix actual start if needed
 	 */
-	public void setActualDuration(long actualDuration) {
-		if (getDuration() > 0)
-			setPercentComplete(((double)actualDuration)/getDuration());
+		public void setActualDuration(long actualDuration) {
+		long workingDuration = getWorkingDuration();
+		if (workingDuration > 0)
+			setPercentComplete(((double)actualDuration)/workingDuration);
 	}
 
 	public void clearDuration() {
@@ -857,19 +930,13 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
 		return Math.round(getEffectiveWorkCalendar().compare(getEnd(), getStart(),true) * CalendarOption.getInstance().getFractionOfDayThatIsWorking());
 	}
 	public long getRemainingDuration() {
-		return DateTime.closestDate( (getDuration() * (1.0D - percentComplete)));
+		return DateTime.closestDate( (getWorkingDuration() * (1.0D - percentComplete)));
 	}
 
 	public void setRemainingDuration(long remainingDuration) {
-//		if (getDuration() > 0) {
-//			double actual = (percentComplete * getDuration());
-//			long total = (long) (actual + remainingDuration);
-//			setDuration(total);
-//			if (actual != 0.0D)
-//				setPercentComplete(actual / total);
-//			
-//		}
-			setPercentComplete(1.0D - ((double)remainingDuration)/getDuration());
+		long workingDuration = getWorkingDuration();
+		if (workingDuration > 0)
+			setPercentComplete(1.0D - ((double)remainingDuration)/workingDuration);
 	}
 	
 	/**
@@ -879,7 +946,7 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
 	public long getStop() {
 		long stop = 0;
 		if (percentComplete > 0.0 && percentComplete != INSTANT_COMPLETION) {
-			stop = getEffectiveWorkCalendar().add(getStart(),getActualDuration(),true); // use earlier date
+						stop = getEffectiveWorkCalendar().add(getStart(),getActualSpan(),true); // use earlier date
 		}
 		return stop;
 	}
@@ -904,19 +971,11 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
 			return;
 		if (percentComplete == 1.0 && stop >= getActualFinish()) // adjust to be no later than actual finish
 			return;
-		
-//		System.out.println("setting stop to  " + new java.util.Date(stop));
-
 		if (stop <= getStart()) { // if getting rid of completion
 			setPercentComplete(0);
 		} else {
-			long actualDuration = getEffectiveWorkCalendar().compare(stop,getStart(),false);
-//			if (getDependencyStart() >= getStop() && getDependencyStart() < stop) {// if setting stop incorporates split due to dependency
-//				actualDuration -= getSplitDuration();
-//			}
-		//	duration = getWorkContour().calcTotalBucketDuration(0);
-			
-			long d = getDuration();
+			long actualDuration = spanToWorking(getEffectiveWorkCalendar().compare(stop,getStart(),false)); // gaps before the stop are not progress
+			long d = getWorkingDuration();
 			if (d != 0)
 				setPercentComplete(((double)actualDuration) / d);
 		}
@@ -928,7 +987,7 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
 		long resume = 0;
 		
 		if (percentComplete > 0.0)
-			resume = getEffectiveWorkCalendar().add(getStart(),getActualDuration(),false); // use later date
+						resume = getEffectiveWorkCalendar().add(getStart(),getActualSpan(),false); // use later date
 		resume = Math.max(resume,getDependencyStart());
 		if (workContour.isPersonal()) {
 			
@@ -959,7 +1018,7 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
 	
 	
 	
-	private static short DEFAULT_VERSION=1;
+	private static short DEFAULT_VERSION=2; // 2: percent complete counts working time only, split gaps excluded
 	private short version=DEFAULT_VERSION;
 	
 	private void writeObject(ObjectOutputStream s) throws IOException {
@@ -975,6 +1034,8 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
 	    	s.writeObject(workContour.getContourBuckets());
 	    if (costContourType==CONTOURED)
 	    	s.writeObject(costContour.getContourBuckets());
+	    
+	    version = DEFAULT_VERSION; // written in the current layout
 	    
 	    if (version>=1){
 	    	s.writeBoolean(taskSchedule==null);
@@ -1001,6 +1062,14 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
 //	    		costContour = StandardContour.getStandardContour(costContourType);
 //	    	}
 	    } else costContour = StandardContour.getStandardContour(costContourType);
+	    if (version < 2 && workContour.isPersonal() && percentComplete > 0.0 && percentComplete < 1.0 && percentComplete != INSTANT_COMPLETION) {
+	    	// Files written before version 2 measured percent complete over the whole profile, split
+	    	// gaps included. Keep the stop date where it was by converting to the work-based figure.
+	    	long oldActualSpan = DateTime.closestDate(duration * percentComplete);
+	    	long workingDuration = getWorkingDuration();
+	    	if (workingDuration > 0)
+	    		percentComplete = ((double) spanToWorking(oldActualSpan)) / workingDuration;
+	    }
 	    
 	    if (version>=1){
 	    	boolean nullSchedule=s.readBoolean();
