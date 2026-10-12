@@ -1514,6 +1514,35 @@ public final class Assignment implements Schedule, Association, Allocation, Dela
 		return ((double)baselineWork)/work;
 
 	}
+		/** Baseline work planned up to the status date: the hours counterpart of {@link #bcws(long, long)}. */
+	public long bcwsWork(long start, long end) {
+		if (!isInRange(start,end) || !isLabor())
+			return NO_VALUE_LONG;
+		if (AdvancedOption.getInstance().isEarnedValueFieldsCumulative())
+			start = getStart(); // start from the beginning of the task and ignore the range start
+		Query query = Query.getInstance();
+		SelectFrom clause = SelectFrom.getInstance().whereInRange(Math.max(start,detail.effectiveBaselineStart()),Math.min(end,getStatusDate()));
+		query.selectFrom(clause)
+			.action(baselineData(WORK,clause))
+			.execute();
+		return (long) ((DoubleValue)query.getActionVisitor()).getValue();
+	}
+
+	/** Work earned up to the status date, actual work scaled by baseline over current work: the hours counterpart of {@link #bcwp(long, long)}. */
+	public long bcwpWork(long start, long end) {
+		if (!isInRange(start,end) || !isLabor())
+			return NO_VALUE_LONG;
+		end = Math.min(end,getStatusDate());
+		if (end == 0)
+			return 0;
+		if (AdvancedOption.getInstance().isEarnedValueFieldsCumulative())
+			start = getStart(); // start from the beginning of the task and ignore the range start
+		long work = actualWork(start,end);
+		if (work == 0)
+			return 0;
+		return Math.round(efficiency() * work);
+	}
+
 	//[(Actual % of completion / Expected % of completion) of an activity for a given period] * Actual cost of activity
 	public double bcwp(long start, long end) {
 		if (!isInRange(start,end))

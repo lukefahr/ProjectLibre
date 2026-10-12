@@ -1558,6 +1558,58 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 				.end(fieldContext));
 	}
 
+		/***************************************************************************
+	 * Earned value in hours: the same measures as BCWS/BCWP but on work, so they
+	 * do not depend on resource rates.
+	 **************************************************************************/
+	private static final int EVW_BCWS=0, EVW_BCWP=1;
+
+	private long earnedValueWork(int which, long start, long end) {
+		long total = 0;
+		if (isWbsParent()) {
+			Collection children = getWbsChildrenNodes();
+			if (children == null) return 0;
+			for (Iterator i = children.iterator(); i.hasNext();) {
+				Object current = ((Node) i.next()).getImpl();
+				if (current instanceof NormalTask)
+					total += ((NormalTask) current).earnedValueWork(which, start, end);
+			}
+			return total;
+		}
+		for (Iterator i = getAssignments().iterator(); i.hasNext();) {
+			Assignment assignment = (Assignment) i.next();
+			total += which == EVW_BCWS ? assignment.bcwsWork(start, end) : assignment.bcwpWork(start, end);
+		}
+		return total;
+	}
+	public long bcwsWork(long start, long end) {
+		return earnedValueWork(EVW_BCWS, start, end);
+	}
+	public long bcwpWork(long start, long end) {
+		return earnedValueWork(EVW_BCWP, start, end);
+	}
+	public long getBcwsWork(FieldContext fieldContext) {
+		return bcwsWork(FieldContext.start(fieldContext), FieldContext.end(fieldContext));
+	}
+	public long getBcwpWork(FieldContext fieldContext) {
+		return bcwpWork(FieldContext.start(fieldContext), FieldContext.end(fieldContext));
+	}
+	public long getSvWork(FieldContext fieldContext) {
+		return getBcwpWork(fieldContext) - getBcwsWork(fieldContext);
+	}
+	public double getSvWorkPercent(FieldContext fieldContext) {
+		long bcws = getBcwsWork(fieldContext);
+		if (bcws == 0)
+			return 0.0D;
+		return ((double) (getBcwpWork(fieldContext) - bcws)) / bcws;
+	}
+	public double getSpiWork(FieldContext fieldContext) {
+		long bcws = getBcwsWork(fieldContext);
+		if (bcws == 0)
+			return 0.0D;
+		return ((double) getBcwpWork(fieldContext)) / bcws;
+	}
+
 	public double getBac(FieldContext fieldContext) {
 		return bac(FieldContext.start(fieldContext), FieldContext
 				.end(fieldContext));

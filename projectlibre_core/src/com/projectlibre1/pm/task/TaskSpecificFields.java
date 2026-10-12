@@ -68,7 +68,13 @@ public interface TaskSpecificFields {
 	void setFixedCost(double fixedCost);	
 	boolean isWbsParent();
 	int getOutlineLevel();
-	String getWbsParentName();
+
+	/** Earned value in hours: planned and earned work to the status date, and the measures derived from them. */
+	public long getBcwsWork(com.projectlibre1.field.FieldContext fieldContext);
+	public long getBcwpWork(com.projectlibre1.field.FieldContext fieldContext);
+	public long getSvWork(com.projectlibre1.field.FieldContext fieldContext);
+	public double getSvWorkPercent(com.projectlibre1.field.FieldContext fieldContext);
+	public double getSpiWork(com.projectlibre1.field.FieldContext fieldContext);	String getWbsParentName();
 	WorkCalendar getTaskCalendar();
 	void setTaskCalendar(WorkCalendar workCalendar);
 	String getResourceInitials();

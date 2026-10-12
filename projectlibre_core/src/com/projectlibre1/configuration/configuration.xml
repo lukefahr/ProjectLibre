@@ -441,8 +441,18 @@
 			</field>
 			<field property="wbsParent" id="Field.wbsParent"
 				readOnly="true" />
-			<field property="outlineLevel" id="Field.outlineLevel"
+						<field property="outlineLevel" id="Field.outlineLevel"
 				readOnly="true" />
+			<field property="bcwsWork" id="Field.bcwsWork" readOnly="true" help="Earned_Value"
+				vector="true" duration="true" work="true" sum="Sum" />
+			<field property="bcwpWork" id="Field.bcwpWork" readOnly="true" help="Earned_Value"
+				vector="true" duration="true" work="true" sum="Sum" />
+			<field property="svWork" id="Field.svWork" readOnly="true" help="Earned_Value"
+				vector="true" duration="true" work="true" sum="Sum" />
+			<field property="svWorkPercent" id="Field.svWorkPercent" readOnly="true" help="Earned_Value"
+				vector="true" percent="true" />
+			<field property="spiWork" id="Field.spiWork" readOnly="true" help="Earned_Value"
+				vector="true" />
 			<field property="wbsParentName" id="Field.wbsParentName"
 				readOnly="true" />
 			<field property="resourceInitials" help="Assign_Resources#Resources_on_the_Gantt_spreadsheet"

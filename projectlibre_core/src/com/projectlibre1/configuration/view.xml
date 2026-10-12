@@ -469,6 +469,18 @@
 			<column>Field.csi</column>
 		</columns>
 	</spreadsheet>
+		<spreadsheet id="Spreadsheet.Task.earnedValueScheduleHours" category="taskSpreadsheet">
+		<columns>
+			<column>Field.id</column>
+			<column>Field.name</column>
+			<column>Field.outlineLevel</column>
+			<column>Field.bcwsWork</column>
+			<column>Field.bcwpWork</column>
+			<column>Field.svWork</column>
+			<column>Field.svWorkPercent</column>
+			<column>Field.spiWork</column>
+		</columns>
+	</spreadsheet>
 	<spreadsheet id="Spreadsheet.Resource.earnedValueScheduleIndicators" category="resourceSpreadsheet" cellStyleId="CellStyle.resources" actionListId="ActionList.resource">
 		<columns>
 			<column>Field.id</column>
