@@ -1588,11 +1588,17 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 	public long bcwpWork(long start, long end) {
 		return earnedValueWork(EVW_BCWP, start, end);
 	}
+	private static final long TENTH_OF_AN_HOUR = 6L * 60L * 1000L;
+
+	/** The hours fields are reported to the nearest tenth of an hour. */
+	private static long roundToTenthOfAnHour(long millis) {
+		return Math.round(millis / (double) TENTH_OF_AN_HOUR) * TENTH_OF_AN_HOUR;
+	}
 	public long getBcwsWork(FieldContext fieldContext) {
-		return bcwsWork(FieldContext.start(fieldContext), FieldContext.end(fieldContext));
+		return roundToTenthOfAnHour(bcwsWork(FieldContext.start(fieldContext), FieldContext.end(fieldContext)));
 	}
 	public long getBcwpWork(FieldContext fieldContext) {
-		return bcwpWork(FieldContext.start(fieldContext), FieldContext.end(fieldContext));
+		return roundToTenthOfAnHour(bcwpWork(FieldContext.start(fieldContext), FieldContext.end(fieldContext)));
 	}
 	public long getSvWork(FieldContext fieldContext) {
 		return getBcwpWork(fieldContext) - getBcwsWork(fieldContext);
