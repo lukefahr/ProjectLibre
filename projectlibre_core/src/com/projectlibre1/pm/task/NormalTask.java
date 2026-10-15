@@ -87,6 +87,7 @@ import com.projectlibre1.graphic.configuration.HasTaskIndicators;
 import com.projectlibre1.grouping.core.Node;
 import com.projectlibre1.grouping.core.model.NodeModel;
 import com.projectlibre1.grouping.core.summaries.DeepChildWalker;
+import com.projectlibre1.options.AdvancedOption;
 import com.projectlibre1.options.CalculationOption;
 import com.projectlibre1.options.CalendarOption;
 import com.projectlibre1.options.ScheduleOption;
@@ -1361,7 +1362,43 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 	}
 
 	public double bcws(long start, long end) {
-		return rollUpEarnedValue(((TaskSnapshot) getCurrentSnapshot()).bcws(start, end),EV_BCWS,start,end);
+		return rollUpEarnedValue(baselineScheduledCost(start, end),EV_BCWS,start,end);
+	}
+
+	/**
+	 * Baseline cost scheduled through the status date, read from the baseline snapshot itself.
+	 * Going through the current assignments and matching each one to a baseline assignment by
+	 * resource loses the baseline of any task whose resource changed after it was baselined.
+	 */
+	private double baselineScheduledCost(long start, long end) {
+		TaskSnapshot baseline = getBaselineSnapshot();
+		if (baseline == null)
+			return 0.0D;
+		end = Math.min(end, getProject().getStatusDate());
+		if (AdvancedOption.getInstance().isEarnedValueFieldsCumulative())
+			start = 0; // from the beginning of the baseline, not of the range
+		if (end <= start)
+			return 0.0D;
+		return baseline.cost(start, end);
+	}
+
+	/** Baseline labor work scheduled through the status date, the hours counterpart of {@link #baselineScheduledCost}. */
+	private long baselineScheduledWork(long start, long end) {
+		TaskSnapshot baseline = getBaselineSnapshot();
+		if (baseline == null)
+			return 0L;
+		end = Math.min(end, getProject().getStatusDate());
+		if (AdvancedOption.getInstance().isEarnedValueFieldsCumulative())
+			start = 0;
+		if (end <= start)
+			return 0L;
+		long total = 0L;
+		for (Iterator i = baseline.getAssignments().iterator(); i.hasNext();) {
+			Assignment assignment = (Assignment) i.next();
+			if (assignment.isLabor())
+				total += assignment.work(start, end);
+		}
+		return total;
 	}
 
 	boolean isInRange(long start, long finish) {
@@ -1576,9 +1613,11 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 			}
 			return total;
 		}
+		if (which == EVW_BCWS)
+			return baselineScheduledWork(start, end);
 		for (Iterator i = getAssignments().iterator(); i.hasNext();) {
 			Assignment assignment = (Assignment) i.next();
-			total += which == EVW_BCWS ? assignment.bcwsWork(start, end) : assignment.bcwpWork(start, end);
+			total += assignment.bcwpWork(start, end);
 		}
 		return total;
 	}

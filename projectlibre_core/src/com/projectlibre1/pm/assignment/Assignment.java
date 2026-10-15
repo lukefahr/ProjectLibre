@@ -1490,7 +1490,7 @@ public final class Assignment implements Schedule, Association, Allocation, Dela
 			return NO_VALUE_DOUBLE;
 
 		if (AdvancedOption.getInstance().isEarnedValueFieldsCumulative())
-			start = getStart(); // start from the beginning of the task and ignore the range start
+			start = detail.effectiveBaselineStart(); // from the beginning of the baseline, not of the range
 
 		Query query = Query.getInstance();
 		SelectFrom clause = SelectFrom.getInstance().whereInRange(Math.max(start,detail.effectiveBaselineStart()),Math.min(end,getStatusDate()));
@@ -1519,7 +1519,7 @@ public final class Assignment implements Schedule, Association, Allocation, Dela
 		if (!isInRange(start,end) || !isLabor())
 			return NO_VALUE_LONG;
 		if (AdvancedOption.getInstance().isEarnedValueFieldsCumulative())
-			start = getStart(); // start from the beginning of the task and ignore the range start
+			start = detail.effectiveBaselineStart(); // from the beginning of the baseline, not of the range
 		Query query = Query.getInstance();
 		SelectFrom clause = SelectFrom.getInstance().whereInRange(Math.max(start,detail.effectiveBaselineStart()),Math.min(end,getStatusDate()));
 		query.selectFrom(clause)
