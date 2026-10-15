@@ -1358,7 +1358,50 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 	}
 
 	public double bcwp(long start, long end) {
-		return rollUpEarnedValue(((TaskSnapshot) getCurrentSnapshot()).bcwp(start, end),EV_BCWP,start,end);
+		return rollUpEarnedValue(baselineEarnedCost(start, end),EV_BCWP,start,end);
+	}
+
+	/**
+	 * Baseline cost earned by the status date: the task's baseline cost scaled by the share of its
+	 * current work done by then. Like {@link #baselineScheduledCost} this reads the baseline snapshot
+	 * itself rather than matching current assignments to baseline assignments by resource.
+	 */
+	private double baselineEarnedCost(long start, long end) {
+		TaskSnapshot baseline = getBaselineSnapshot();
+		if (baseline == null)
+			return 0.0D;
+		double fraction = workDoneFraction(start, end);
+		if (fraction == 0.0D)
+			return 0.0D;
+		return baseline.cost(0, DateTime.getMaxDate().getTime()) * fraction;
+	}
+
+	/** Baseline labor work earned by the status date, the hours counterpart of {@link #baselineEarnedCost}. */
+	private long baselineEarnedWork(long start, long end) {
+		TaskSnapshot baseline = getBaselineSnapshot();
+		if (baseline == null)
+			return 0L;
+		double fraction = workDoneFraction(start, end);
+		if (fraction == 0.0D)
+			return 0L;
+		return Math.round(baselineLaborWork(baseline, 0, DateTime.getMaxDate().getTime()) * fraction);
+	}
+
+	/**
+	 * Share of this task's current work done within the range and by the status date. A task with
+	 * no work, such as a milestone carrying a cost, uses its recorded percent complete.
+	 */
+	private double workDoneFraction(long start, long end) {
+		end = Math.min(end, getProject().getStatusDate());
+		if (AdvancedOption.getInstance().isEarnedValueFieldsCumulative())
+			start = 0;
+		if (end <= start)
+			return 0.0D;
+		TaskSnapshot current = (TaskSnapshot) getCurrentSnapshot();
+		long work = current.work(0, DateTime.getMaxDate().getTime());
+		if (work <= 0)
+			return getPercentComplete();
+		return Math.min(1.0D, ((double) current.actualWork(start, end)) / work);
 	}
 
 	public double bcws(long start, long end) {
@@ -1392,6 +1435,10 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 			start = 0;
 		if (end <= start)
 			return 0L;
+		return baselineLaborWork(baseline, start, end);
+	}
+
+	private static long baselineLaborWork(TaskSnapshot baseline, long start, long end) {
 		long total = 0L;
 		for (Iterator i = baseline.getAssignments().iterator(); i.hasNext();) {
 			Assignment assignment = (Assignment) i.next();
@@ -1613,13 +1660,7 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 			}
 			return total;
 		}
-		if (which == EVW_BCWS)
-			return baselineScheduledWork(start, end);
-		for (Iterator i = getAssignments().iterator(); i.hasNext();) {
-			Assignment assignment = (Assignment) i.next();
-			total += assignment.bcwpWork(start, end);
-		}
-		return total;
+		return which == EVW_BCWS ? baselineScheduledWork(start, end) : baselineEarnedWork(start, end);
 	}
 	public long bcwsWork(long start, long end) {
 		return earnedValueWork(EVW_BCWS, start, end);
