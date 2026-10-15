@@ -218,20 +218,20 @@
 		</class>
 		<class name="com.projectlibre1.pm.costing.BasicEarnedValueFields">
 			<field property="acwp" id="Field.acwp" readOnly="true" help="Earned_Value"
-				vector="true" money="true" sum="Sum" >
+				vector="true" money="true" sum="This" groupSum="Sum" >
 				<permission roles="Administrator;ProjectManager"/>
 			</field>
 				
 			<field property="bac" id="Field.bac" readOnly="true" help="Earned_Value"
-				vector="true" money="true" sum="Sum" >
+				vector="true" money="true" sum="This" groupSum="Sum" >
 				<permission roles="Administrator;ProjectManager"/>
 			</field>
 			<field property="bcwp" id="Field.bcwp" readOnly="true" help="Earned_Value"
-				vector="true" money="true" sum="Sum" >
+				vector="true" money="true" sum="This" groupSum="Sum" >
 				<permission roles="Administrator;ProjectManager"/>
 			</field>
 			<field property="bcws" id="Field.bcws" readOnly="true" help="Earned_Value"
-				vector="true" money="true" sum="Sum" >
+				vector="true" money="true" sum="This" groupSum="Sum" >
 				<permission roles="Administrator;ProjectManager"/>
 			</field>
 			<field property="finishOffset" id="Field.finishOffset"
@@ -241,19 +241,19 @@
 		</class>
 		<class name="com.projectlibre1.pm.costing.EarnedValueFields">
 			<field property="cv" id="Field.cv" readOnly="true" help="Earned_Value"
-				vector="true" money="true" sum="Sum" >
+				vector="true" money="true" sum="This" groupSum="Sum" >
 				<permission roles="Administrator;ProjectManager"/>
 			</field>
 			<field property="sv" id="Field.sv" readOnly="true" help="Earned_Value"
-				vector="true" money="true" sum="Sum" >
+				vector="true" money="true" sum="This" groupSum="Sum" >
 				<permission roles="Administrator;ProjectManager"/>
 			</field>
 			<field property="eac" id="Field.eac" readOnly="true" help="Earned_Value"
-				vector="true" money="true" sum="Sum" >
+				vector="true" money="true" sum="This" groupSum="Sum" >
 				<permission roles="Administrator;ProjectManager"/>
 			</field>
 			<field property="vac" id="Field.vac" readOnly="true" help="Earned_Value"
-				vector="true" money="true" sum="Sum" >
+				vector="true" money="true" sum="This" groupSum="Sum" >
 				<permission roles="Administrator;ProjectManager"/>
 			</field>
 			<field property="cpi" id="Field.cpi" readOnly="true" help="Earned_Value"
@@ -444,11 +444,11 @@
 						<field property="outlineLevel" id="Field.outlineLevel"
 				readOnly="true" />
 			<field property="bcwsWork" id="Field.bcwsWork" readOnly="true" help="Earned_Value"
-				vector="true" duration="true" work="true" sum="Sum" />
+				vector="true" duration="true" work="true" sum="This" groupSum="Sum" />
 			<field property="bcwpWork" id="Field.bcwpWork" readOnly="true" help="Earned_Value"
-				vector="true" duration="true" work="true" sum="Sum" />
+				vector="true" duration="true" work="true" sum="This" groupSum="Sum" />
 			<field property="svWork" id="Field.svWork" readOnly="true" help="Earned_Value"
-				vector="true" duration="true" work="true" sum="Sum" />
+				vector="true" duration="true" work="true" sum="This" groupSum="Sum" />
 			<field property="svWorkPercent" id="Field.svWorkPercent" readOnly="true" help="Earned_Value"
 				vector="true" percent="true" />
 			<field property="spiWork" id="Field.spiWork" readOnly="true" help="Earned_Value"
