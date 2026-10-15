@@ -56,13 +56,21 @@
 package com.projectlibre1.pm.graphic.spreadsheet.editor;
 
 import java.awt.Component;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.text.NumberFormat;
 import java.text.ParseException;
 
+import javax.swing.JFormattedTextField;
 import javax.swing.JSpinner;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingUtilities;
 import javax.swing.JSpinner.NumberEditor;
 
 import com.projectlibre1.configuration.Settings;
@@ -132,7 +140,51 @@ public class SpinEditor extends SimpleEditor {
 			editor = new JSpinner.NumberEditor(spinner,template);
 		spinner.setEditor(editor);
 		editor.getTextField().setHorizontalAlignment(JTextField.RIGHT);
+		if (!inSpreadSheet)
+			selectAllOnFocus(editor.getTextField()); // in a spreadsheet the cell editor takes care of this
 		return spinner;
+	}
+
+	/**
+	 * Select the whole value whenever the field gets the focus, by click or by keyboard, so that
+	 * typing replaces it. Without this a click lands the caret next to the old value and the typed
+	 * text is appended to it: "0%" followed by "20%" gives "0%20%", of which only the leading "0%" is
+	 * parsed, so the typed value seems to vanish. The formatted field rewrites its text when it gains
+	 * focus and the caret moves to the click point on release, so the selection is applied after each
+	 * of those, until the user types.
+	 */
+	public static void selectAllOnFocus(final JFormattedTextField textField) {
+		final boolean[] pending = { false };
+		textField.addFocusListener(new FocusAdapter() {
+			public void focusGained(FocusEvent e) {
+				if (e.isTemporary())
+					return;
+				pending[0] = true;
+				SwingUtilities.invokeLater(new Runnable() {
+					public void run() {
+						if (pending[0])
+							textField.selectAll();
+					}
+				});
+			}
+			public void focusLost(FocusEvent e) {
+				if (!e.isTemporary())
+					pending[0] = false;
+			}
+		});
+		textField.addMouseListener(new MouseAdapter() {
+			public void mouseReleased(MouseEvent e) {
+				if (pending[0] && SwingUtilities.isLeftMouseButton(e)) {
+					pending[0] = false; // a later click is the user placing the caret
+					textField.selectAll();
+				}
+			}
+		});
+		textField.addKeyListener(new KeyAdapter() {
+			public void keyTyped(KeyEvent e) {
+				pending[0] = false; // the user has typed: leave the text alone from now on
+			}
+		});
 	}
 	
 	public static Object getValue(JSpinner spinner, Field field) {
