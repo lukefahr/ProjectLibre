@@ -367,6 +367,18 @@ public class CoordinatesConverter implements ScheduleEventListener, Serializable
 		return project;
 	}
 
+    /**
+     * Narrowest width, in pixels, a bar or a piece of a split bar is drawn with. A few hours of work at a
+     * weekly or monthly zoom would otherwise be a sliver that looks gone and cannot be grabbed.
+     */
+    public static final double MIN_SEGMENT_WIDTH=5;
+
+    /** End x of a bar piece, widened to {@link #MIN_SEGMENT_WIDTH} if it has some length but is narrower. */
+    public static double segmentEndX(double start,double end){
+    	if (end>start && end-start<MIN_SEGMENT_WIDTH) return start+MIN_SEGMENT_WIDTH;
+    	return end;
+    }
+
     public static double adaptSmallBarEndX(double start,double end, GraphicNode node, GraphicConfiguration config){
     	if (config==null) config=GraphicConfiguration.getInstance();
     	if (config.getGanttBarMinWidth()==0 || node==null || node.getIntervalCount()>1) return end;

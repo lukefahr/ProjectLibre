@@ -216,6 +216,8 @@ public class GanttRenderer extends GraphRenderer implements Serializable {
 			}
 			double x=coord.toX(interval.getStart());
 			double width=CoordinatesConverter.adaptSmallBarEndX(x,coord.toX(interval.getEnd()),node,config)-x;
+			if (interval.getEnd()>interval.getStart())
+				width=CoordinatesConverter.segmentEndX(x,x+width)-x; // keep short pieces, such as the tail of a split task, visible
 //			double width=coord.toW(interval.getEnd()-interval.getStart());
 			double height;
 			double y=yrow+config.getGanttBarYOffset();

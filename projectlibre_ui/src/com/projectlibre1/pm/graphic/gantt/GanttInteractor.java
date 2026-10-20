@@ -140,18 +140,30 @@ public class GanttInteractor extends GraphInteractor{
 				interval=coord.adaptSmallBarTimeInterval(interval, node,config);
 
 			}
-    		if (t<interval.getStart()&&t>=interval.getStart()-deltaOutside){
+			// hit test against the piece as drawn: short pieces are drawn wider than they are
+			double hitStart=interval.getStart();
+			double hitEnd=interval.getEnd();
+			boolean narrow=false;
+			if (coord!=null&&interval.getEnd()>interval.getStart()){
+				double xStart=coord.toX(interval.getStart());
+				double xEnd=CoordinatesConverter.segmentEndX(xStart,coord.toX(interval.getEnd()));
+				hitEnd=coord.toTime(xEnd);
+				narrow=xEnd-xStart<config.getSelectionResize0()+config.getSelectionResize1()+CoordinatesConverter.MIN_SEGMENT_WIDTH;
+			}
+    		if (t<hitStart&&t>=hitStart-deltaOutside){
     			if (selectedIsNonSummaryNode()) state=BAR_MOVE_START;
-    		}else if (t>interval.getEnd()&&t<=interval.getEnd()+deltaOutside){
+    		}else if (t>hitEnd&&t<=hitEnd+deltaOutside){
     			if (selectedIsNonSummaryNode()) state=BAR_MOVE_END;
-    		}else if (t<interval.getStart()||t>interval.getEnd()){
+    		}else if (t<hitStart||t>hitEnd){
     			selectedIntervalNumber++;
     			return;
        		}else if (completedInterval!=null&&t>=completedInterval.getEnd()-completedDeltaT0&&t<=completedInterval.getEnd()+completedDeltaT1&&selectedZone!=null&&selectedZone.getZoneId()==GanttUI.PROGRESS_BAR_ZONE_ID){
        			if (selectedIsNonSummaryNode()) state=PROGRESS_BAR_MOVE;
-    		}else if (t<=interval.getStart()+deltaResize0){
+    		}else if (narrow){
+    			state=BAR_MOVE; // too short to have resize handles inside it: grab it to move it, resize from just outside its ends
+    		}else if (t<=hitStart+deltaResize0){
     			if (selectedIsNonSummaryNode()) state=BAR_MOVE_START;
-    		}else if (t>=interval.getEnd()-deltaResize1){
+    		}else if (t>=hitEnd-deltaResize1){
     			if (selectedIsNonSummaryNode()) state=BAR_MOVE_END;
     		} else state= BAR_MOVE;
     		selectedInterval=interval;
@@ -170,6 +182,13 @@ public class GanttInteractor extends GraphInteractor{
     protected Shape getBarShadowBounds(double x,double y){
 		double deltaX=x-x0;
 		CoordinatesConverter coord=getCoord();
+		if (state==SPLIT){
+			if (!(selected instanceof GraphicNode)) return null;
+			GraphicNode node=(GraphicNode)selected;
+			double xEnd=coord.toX(node.getEnd());
+			if (xEnd<=x0) return null;
+			return new Rectangle2D.Double(x0+Math.max(0,deltaX),((GanttUI)ui).getBarY(node.getRow())+node.getGanttShapeOffset(),xEnd-x0,node.getGanttShapeHeight());
+		}
 		GraphicNode node=(GraphicNode)selected;
 		Rectangle2D bounds;
 		double xStart=coord.toX((selectedIntervalNumber==0&&state==BAR_MOVE)?node.getStart():selectedInterval.getStart());
@@ -178,6 +197,7 @@ public class GanttInteractor extends GraphInteractor{
 			bounds=new Rectangle2D.Double(xStart,((GanttUI)ui).getBarY(node.getRow())+node.getGanttShapeOffset()+(node.getGanttShapeHeight()-config.getGanttProgressBarHeight())/2,completedX-xStart+deltaX,config.getGanttProgressBarHeight());
 		}else{
 			double xEnd=(selectedIntervalNumber==0&&state==BAR_MOVE)?CoordinatesConverter.adaptSmallBarEndX(coord.toX(node.getStart()),coord.toX(node.getEnd()),node,config):coord.toX(selectedInterval.getEnd());
+			xEnd=CoordinatesConverter.segmentEndX(xStart,xEnd);
 			double w=xEnd-xStart;
 			switch (state) {
 			case BAR_MOVE:
@@ -224,7 +244,7 @@ public class GanttInteractor extends GraphInteractor{
     }
 
     protected boolean switchOnLinkCreation(double x, double y){
-    	if (state==PROGRESS_BAR_MOVE) return false;
+    	if (state==PROGRESS_BAR_MOVE||state==SPLIT) return false;
 		GraphicNode node=(GraphicNode)selected;
 		Object impl = node.getNode().getImpl();
 		return impl instanceof HasDependencies &&
@@ -252,8 +272,11 @@ public class GanttInteractor extends GraphInteractor{
     	return cursor;
     }
 
+    /** A split-mode drag shorter than this, in pixels, is a click: it splits off one day. */
+    private static final double SPLIT_CLICK_TOLERANCE=3;
+
     public boolean executeAction(double x,double y){
-    	if (x==x0||selected==null) return false;
+    	if (selected==null||(x==x0&&state!=SPLIT)) return false;
     	if (state==BAR_MOVE||state==BAR_MOVE_START||state==BAR_MOVE_END||state==PROGRESS_BAR_MOVE||state==SPLIT){
     		if (!(selected instanceof GraphicNode)) return false;
     		sourceNode=(GraphicNode)selected;
@@ -287,9 +310,23 @@ public class GanttInteractor extends GraphInteractor{
 		case LINK_SELECTION:
 			showDependencyPropertiesDialog((GraphicDependency)selected);
 			return true;
-		case SPLIT:
-			ScheduleService.getInstance().split(this,(Schedule)sourceNode.getNode().getImpl(),t,t,ui.getGraph().getProject().getUndoController().getEditSupport());
+		case SPLIT: {
+			// Split where the button went down and move the rest by as far as it was dragged, as in
+			// Microsoft Project. A click splits off one day; dragging back to the left cancels.
+			double dragged=x-x0;
+			if (dragged<-SPLIT_CLICK_TOLERANCE)
+				return false;
+			Schedule schedule=(Schedule)sourceNode.getNode().getImpl();
+			long from=(long)getCoord().toTime(x0);
+			long to=dragged>SPLIT_CLICK_TOLERANCE?from+(long)getCoord().toDuration(dragged):from;
+			long resume=schedule.getResume();
+			if (to>from&&resume>from&&resume!=Long.MAX_VALUE){ // completed work stays put: the gap opens where the remaining work starts
+				to+=resume-from;
+				from=resume;
+			}
+			ScheduleService.getInstance().split(this,schedule,from,to,ui.getGraph().getProject().getUndoController().getEditSupport());
 			return true;
+		}
 		}
     	return false;
     }
@@ -317,14 +354,11 @@ public class GanttInteractor extends GraphInteractor{
     	}
     }
 
-    protected boolean isMove(){
-    	return state==BAR_MOVE||state==BAR_MOVE_END||state==BAR_MOVE_START||state==PROGRESS_BAR_MOVE;
-    }
-    protected boolean isDirectAction(){
-    	return state==SPLIT||super.isDirectAction();
+    protected boolean isMove(){ // split is a drag too: press where to split, release where the rest should start
+    	return state==BAR_MOVE||state==BAR_MOVE_END||state==BAR_MOVE_START||state==PROGRESS_BAR_MOVE||state==SPLIT;
     }
     protected boolean isRepaintOnRelease(){
-    	return state==BAR_MOVE||state==BAR_MOVE_END||state==BAR_MOVE_START||state==PROGRESS_BAR_MOVE||state==LINK_CREATION;
+    	return state==BAR_MOVE||state==BAR_MOVE_END||state==BAR_MOVE_START||state==PROGRESS_BAR_MOVE||state==LINK_CREATION||state==SPLIT;
     }
 
 }
