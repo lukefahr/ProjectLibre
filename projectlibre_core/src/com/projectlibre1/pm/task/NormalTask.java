@@ -2158,6 +2158,27 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 		getProject().fireScheduleChanged(this, ScheduleEvent.ACTUAL, this);
 	}
 
+	/**
+	 * A summary's actual start is the earliest actual start of its children, completed ones included.
+	 * It is worked out from the children each time rather than read from the stored value, which only
+	 * counted children in progress and could be left behind by edits: the forward pass uses it as the
+	 * earliest start for the summary's unstarted children, so a late stored value held them back.
+	 */
+	public long getActualStart() {
+		if (!isWbsParent() || isSubproject())
+			return super.getActualStart();
+		long earliest = 0;
+		for (Iterator i = getWbsChildrenNodes().iterator(); i.hasNext();) {
+			Object child = ((Node) i.next()).getImpl();
+			if (!(child instanceof NormalTask))
+				continue;
+			long childStart = ((NormalTask) child).getActualStart();
+			if (childStart != 0 && (earliest == 0 || childStart < earliest))
+				earliest = childStart;
+		}
+		return earliest;
+	}
+
 	public void setActualStartNoEvent(long actualStart) {
 		long old = getActualStart();
 		if (actualStart == old)
