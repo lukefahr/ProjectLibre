@@ -417,7 +417,10 @@ public class CalendarDefinition implements WorkCalendar, Cloneable {
 			scratchDate.set(Calendar.HOUR_OF_DAY,0);
 			scratchDate.set(Calendar.MINUTE,0);
 			scratchDate.set(Calendar.SECOND,0); // Fixed rounding bug as we now go to seconds 8/2/07
-//			scratchDate.set(Calendar.MILLISECOND,0);
+			// Milliseconds too: otherwise a date such as 8:11:49.812 gives a "day" of midnight plus 812 ms,
+			// and when the later date's milliseconds are smaller the day loop in compare() stops a day
+			// early and drops a whole working day.
+			scratchDate.set(Calendar.MILLISECOND,0);
 			return scratchDate.getTimeInMillis();
 		}
 
