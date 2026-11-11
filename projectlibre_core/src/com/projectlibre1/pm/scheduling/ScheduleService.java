@@ -134,8 +134,11 @@ public class ScheduleService {
 		if (isReadOnly(schedule))
 			return;
 		Object detailBackup=null;
+		// Dragging a whole bar moves both ends by the same amount; resizing moves one. Keep a moved bar's
+		// exact length so the schedule can tell the two apart (rounding each end separately would not).
+		boolean barMove = start != interval.getStart() && end - start == interval.getEnd() - interval.getStart();
 		start = DateTime.hourFloor(start);
-		end = DateTime.hourFloor(end);
+		end = barMove ? start + (interval.getEnd() - interval.getStart()) : DateTime.hourFloor(end);
 		if (interval.getStart() == start && interval.getEnd() == end) // if no move do nothing
 			return;
 		if (undoableEditSupport!=null&&!(eventSource instanceof UndoableEdit)){

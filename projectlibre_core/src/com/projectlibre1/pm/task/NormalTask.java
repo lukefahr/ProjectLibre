@@ -2045,8 +2045,13 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 	 */
 	public void moveInterval(Object eventSource, long start, long end, ScheduleInterval oldInterval, boolean isChild) {
 		WorkCalendar cal = getEffectiveWorkCalendar();
+		boolean barMove = start != oldInterval.getStart() && end - start == oldInterval.getEnd() - oldInterval.getStart(); // see ScheduleService.setInterval
 		start = cal.adjustInsideCalendar(start,false);
 		boolean shifting = cal.compare(start,oldInterval.getStart(),false) != 0;
+		if (barMove && !shifting) // dropped where it would start in non-working time that leads back to where it is: nothing moves.
+			return;               // Without this the start stayed put and the end moved, which cut work out of the bar.
+		if (barMove)
+			end = start + (oldInterval.getEnd() - oldInterval.getStart());
 		long assignmentStart = getEarliestAssignmentStart();
 		long amountFromStart = cal.compare(oldInterval.getStart(),assignmentStart,false); // possible that they are not the same but there is no working time between them
 		if (shifting && amountFromStart == 0L) { // see if first bar shifted -The first bar is drawn from the first assignment and not from the task start.
@@ -2056,7 +2061,7 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 			setStart(newTaskStart);
 		} else {
 			long amount =cal.compare(end,oldInterval.getEnd(),false);
-			if (amount == 0L) // skip if nothing moved
+			if (amount == 0L && !barMove) // skip if nothing moved (a moved bar can end in non-working time and still have moved)
 				return;
 
 			Iterator i = getAssignments().iterator();

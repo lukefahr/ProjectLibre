@@ -991,7 +991,13 @@ public final class Assignment implements Schedule, Association, Allocation, Dela
 	public void moveInterval(Object eventSource, long start, long end, ScheduleInterval oldInterval, boolean isChild) {
 		long startShiftDuration = getEffectiveWorkCalendar().compare(start,oldInterval.getStart(),false);
 		long endShiftDuration = getEffectiveWorkCalendar().compare(end,oldInterval.getEnd(),false);
-		boolean shifting = startShiftDuration != 0L && endShiftDuration != 0L;
+		// A whole bar dragged keeps its length (see ScheduleService.setInterval). It is a move even if one end lands in
+		// non-working time, and if its start lands where no working time separates it from the old start, it does not
+		// move at all: treating it as a resize of the other end used to cut work out of the bar.
+		boolean barMove = start != oldInterval.getStart() && end - start == oldInterval.getEnd() - oldInterval.getStart();
+		if (barMove && startShiftDuration == 0L)
+			return;
+		boolean shifting = barMove || (startShiftDuration != 0L && endShiftDuration != 0L);
 		long stop = getStop(); // Store old completion
 		if (shifting) {
 			shift(oldInterval.getStart(),oldInterval.getEnd(),startShiftDuration);
