@@ -60,6 +60,7 @@ import java.awt.Graphics2D;
 import java.awt.Paint;
 import java.awt.Shape;
 import java.awt.Stroke;
+import java.awt.TexturePaint;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.GeneralPath;
 
@@ -208,7 +209,11 @@ public class TexturedShape {
 		} else { // use paint
 			oldPaint = g2.getPaint();
 			applyPaint(g2, texture);
-			g2.fill(theShape);
+			Paint applied = g2.getPaint();
+			if (applied instanceof TexturePaint && PredefinedPaint.isRectangle(theShape)) // hatched bars: much faster on screen as tile images
+				PredefinedPaint.fillTiled(g2, (TexturePaint) applied, theShape.getBounds2D());
+			else
+				g2.fill(theShape);
 			if (myStroke != PredefinedStroke.SOLID) { // if also specified a
 														// stroke, use it too
 				oldColor = g2.getColor();

@@ -57,6 +57,7 @@ package com.projectlibre1.pm.graphic.gantt;
 
 import java.awt.Color;
 import java.awt.Font;
+import java.awt.TexturePaint;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -307,12 +308,20 @@ public class GanttRenderer extends GraphRenderer implements Serializable {
 			config=((GanttParams)graphInfo).getConfiguration();
 			yrow=node.getRow()*rowHeight;
 
-			if (container!=null){
-				rendererPane=new CellRendererPane();
+			// This runs for every task painted. Create the renderer pane once and add it to the chart once:
+			// adding a new pane on every call left the chart with an ever growing list of children, and
+			// each add rechecked the window's stacking order, so painting and panning slowed down the
+			// longer the window was open.
+			if (container!=null && (rendererPane==null || rendererPane.getParent()!=container)){
+				if (rendererPane==null)
+					rendererPane=new CellRendererPane();
 				container.add(rendererPane);
 			}
-			component.setFont(FontUtil.getFont(null,Environment.GANTT_ANNOTATIONS_FONT));
-			fontMetrics=component.getFontMetrics(component.getFont());
+			Font font=FontUtil.getFont(null,Environment.GANTT_ANNOTATIONS_FONT);
+			if (fontMetrics==null || !font.equals(component.getFont())){ // setFont revalidates the label: only when it changes
+				component.setFont(font);
+				fontMetrics=component.getFontMetrics(font);
+			}
 		}
 
 		public void execute(Object arg0) {
@@ -637,8 +646,7 @@ public class GanttRenderer extends GraphRenderer implements Serializable {
 			//project start
 			int projectStartX=(int)Math.round(coord.toX(project.getStart()));
 			if (projectStartX>=bounds.getX()&&projectStartX<=bounds.getMaxX()){
-				g2.setPaint(projectStartPaint);
-				g2.drawLine(projectStartX,bounds.y,projectStartX,bounds.y+bounds.height);
+				PredefinedPaint.fillTiled(g2,projectStartPaint,projectStartX,bounds.y,1,bounds.height+1); // the dotted line, drawn as tile images
 			}
 
 			//project start
@@ -646,16 +654,14 @@ public class GanttRenderer extends GraphRenderer implements Serializable {
 			if (statusDate != 0) {
 				int statusDateX=(int)Math.round(coord.toX(statusDate));
 				if (statusDateX>=bounds.getX()&&statusDateX<=bounds.getMaxX()){
-					g2.setPaint(statusDatePaint);
-					g2.drawLine(statusDateX,bounds.y,statusDateX,bounds.y+bounds.height);
+					PredefinedPaint.fillTiled(g2,statusDatePaint,statusDateX,bounds.y,1,bounds.height+1); // the dotted line, drawn as tile images
 				}
 			}
 
 			//today
 			int todayX=(int)Math.round(coord.toX(System.currentTimeMillis()));
 			if (todayX>=bounds.getX()&&todayX<=bounds.getMaxX()){
-				g2.setPaint(todayPaint);
-				g2.drawLine(todayX,bounds.y,todayX,bounds.y+bounds.height);
+				PredefinedPaint.fillTiled(g2,todayPaint,todayX,bounds.y,1,bounds.height+1); // the dotted line, drawn as tile images
 			}
 
 
@@ -687,7 +693,13 @@ public class GanttRenderer extends GraphRenderer implements Serializable {
 		if (userScale2) coord.getTimescaleManager().getScale().increment2(cal);
 		else coord.getTimescaleManager().getScale().increment1(cal);
 		endNonWorking=cal.getTimeInMillis();
-		g2.fillRect((int)Math.round(coord.toX(startNonworking)), bounds.y, (int)Math.round(coord.toW(endNonWorking-startNonworking)), bounds.height);
+		int x=(int)Math.round(coord.toX(startNonworking));
+		int w=(int)Math.round(coord.toW(endNonWorking-startNonworking));
+		Paint paint=g2.getPaint();
+		if (paint instanceof TexturePaint) // the hatched shading: draw its tile image, which is much faster on screen
+			PredefinedPaint.fillTiled(g2,(TexturePaint)paint,x,bounds.y,w,bounds.height);
+		else
+			g2.fillRect(x, bounds.y, w, bounds.height);
 	}
 
 

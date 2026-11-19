@@ -58,6 +58,9 @@ package com.projectlibre1.graphic.configuration.shape;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
+import java.awt.Paint;
+import java.awt.Shape;
+import java.awt.geom.Rectangle2D;
 import java.awt.TexturePaint;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
@@ -189,6 +192,66 @@ public class PredefinedPaint extends TexturePaint {
 		}
 
 	}
+	/**
+	 * Fill a rectangle with a texture paint by drawing the paint's tile image across it. Drawing an
+	 * image is accelerated on screen, while filling with a TexturePaint is rendered in software
+	 * there, which made shading large areas (weekends and holidays in the Gantt) slow to repaint.
+	 * The result is the same pattern, aligned to the paint's anchor.
+	 */
+	public static void fillTiled(Graphics2D g2, TexturePaint paint, int x, int y, int w, int h) {
+		fillTiled(g2, paint, new Rectangle(x, y, w, h));
+	}
+
+	/** Same as {@link #fillTiled(Graphics2D, TexturePaint, int, int, int, int)}, covering the same pixels as filling the rectangle would. */
+	public static void fillTiled(Graphics2D g2, TexturePaint paint, Rectangle2D r) {
+		if (r.getWidth() <= 0 || r.getHeight() <= 0)
+			return;
+		BufferedImage tile = paint.getImage();
+		Rectangle2D anchor = paint.getAnchorRect();
+		int tw = tile.getWidth(), th = tile.getHeight();
+		if (!"sun.java2d.SunGraphics2D".equals(g2.getClass().getName()) // printing and PDF export: keep the real pattern fill
+				|| anchor.getWidth() != tw || anchor.getHeight() != th
+				|| anchor.getX() != Math.rint(anchor.getX()) || anchor.getY() != Math.rint(anchor.getY())) { // stretched or offset tile: leave it to the paint
+			Paint old = g2.getPaint();
+			g2.setPaint(paint);
+			g2.fill(r);
+			g2.setPaint(old);
+			return;
+		}
+		int ax = (int) anchor.getX(), ay = (int) anchor.getY();
+		Shape oldClip = g2.getClip();
+		g2.clip(r); // a rectangle clip covers the pixels the fill would, and keeps the fast path
+		int x0 = (int) Math.floor(r.getX()), y0 = (int) Math.floor(r.getY());
+		double x1 = r.getMaxX(), y1 = r.getMaxY();
+		int startX = ax + Math.floorDiv(x0 - ax, tw) * tw;
+		int startY = ay + Math.floorDiv(y0 - ay, th) * th;
+		for (int ty = startY; ty < y1; ty += th)
+			for (int tx = startX; tx < x1; tx += tw)
+				g2.drawImage(tile, tx, ty, null);
+		g2.setClip(oldClip);
+	}
+
+	/** True if the shape is an axis-aligned rectangle, which {@link #fillTiled} can fill. */
+	public static boolean isRectangle(Shape shape) {
+		if (shape instanceof Rectangle2D)
+			return true;
+		Rectangle2D b = shape.getBounds2D();
+		double[] c = new double[6];
+		int corners = 0;
+		for (java.awt.geom.PathIterator it = shape.getPathIterator(null); !it.isDone(); it.next()) {
+			int type = it.currentSegment(c);
+			if (type == java.awt.geom.PathIterator.SEG_CLOSE)
+				continue;
+			if (type != java.awt.geom.PathIterator.SEG_MOVETO && type != java.awt.geom.PathIterator.SEG_LINETO)
+				return false;
+			boolean onX = c[0] == b.getMinX() || c[0] == b.getMaxX();
+			boolean onY = c[1] == b.getMinY() || c[1] == b.getMaxY();
+			if (!onX || !onY || ++corners > 5)
+				return false;
+		}
+		return corners >= 4;
+	}
+
 	private int bar(float a,float b,float w){
 		return Math.round(a*w+(1.0f-w)*b);
 	}
