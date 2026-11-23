@@ -387,14 +387,43 @@ public class Dependency implements Association, BelongsToDocument, DataObject {
 				t = begin;
 				break;
 			case DependencyType.FF:
-				t = ((ScheduleWindow)successor).calcOffsetFrom(end,end,false,false, canStartAtDayEnd);
-				break;
+				// The lag is counted from the predecessor's finish to give the earliest finish allowed, and the
+				// successor's start is then found by counting its duration back on its own calendar. Adding the lag
+				// after counting back measures it from the wrong date, so it lands on the wrong side of days that one
+				// calendar works and the other does not (a resource working a company holiday, for example).
+				earlyDate = tidy((ScheduleWindow)successor, ((ScheduleWindow)successor).calcOffsetFrom(addLag(end),end,false,false, canStartAtDayEnd), canStartAtDayEnd);
+				return earlyDate;
 			case DependencyType.SF:
-				t = ((ScheduleWindow)successor).calcOffsetFrom(begin,begin,false,false, canStartAtDayEnd);
-			break;
+				earlyDate = tidy((ScheduleWindow)successor, ((ScheduleWindow)successor).calcOffsetFrom(addLag(begin),begin,false,false, canStartAtDayEnd), canStartAtDayEnd);
+				return earlyDate;
 		}
 		earlyDate = getEffectiveWorkCalendar().add(t,getLeadValue(), canStartAtDayEnd);
 		return earlyDate;
+	}
+
+	/**
+	 * The predecessor date moved by the lag on the predecessor's calendar, for links whose lag must be applied
+	 * before counting back a task's duration. A finish (or, in the backward pass, a start seen in reverse) is kept
+	 * at the end of a working day rather than moved to the start of the next one, since the two are not the same
+	 * point on a calendar that works the days in between.
+	 */
+	private long addLag(long date) {
+		long lead = getLeadValue();
+		if (Duration.millis(lead) == 0)
+			return date;
+		return getEffectiveWorkCalendar().add(date, lead, true);
+	}
+
+	/**
+	 * Settle a date found by counting back a task's duration on the side of a break (lunch, a night) that this
+	 * link has always used. The settled date is kept only when the task would still finish at the same time from
+	 * it; otherwise the predecessor's calendar has moved it over days that the task's resources work.
+	 */
+	private long tidy(ScheduleWindow task, long date, boolean useSooner) {
+		long settled = getEffectiveWorkCalendar().add(date, 0, useSooner);
+		if (settled == date || date == 0 || date == Long.MAX_VALUE || date == Long.MIN_VALUE)
+			return settled;
+		return task.calcOffsetFrom(settled, settled, true, true, true) == task.calcOffsetFrom(date, date, true, true, true) ? settled : date;
 	}
 	/**
 	 * get the latest finish time for the predecessor. The current
@@ -412,14 +441,15 @@ public class Dependency implements Association, BelongsToDocument, DataObject {
 				t = end;
 				break;
 			case DependencyType.SS:
-				t = ((ScheduleWindow)getPredecessor()).calcOffsetFrom(end,end,false,false, cannotFinishAtDayStart);
-				break;
+				// mirror of the forward FF case: apply the lag first, then count the predecessor's duration
+				lateDate = tidy((ScheduleWindow)getPredecessor(), ((ScheduleWindow)getPredecessor()).calcOffsetFrom(addLag(end),end,false,false, cannotFinishAtDayStart), cannotFinishAtDayStart);
+				return lateDate;
 			case DependencyType.FF:
 				t = begin;
 				break;
 			case DependencyType.SF:
-				t = ((ScheduleWindow)getPredecessor()).calcOffsetFrom(begin,begin,false,false, cannotFinishAtDayStart);
-			break;
+				lateDate = tidy((ScheduleWindow)getPredecessor(), ((ScheduleWindow)getPredecessor()).calcOffsetFrom(addLag(begin),begin,false,false, cannotFinishAtDayStart), cannotFinishAtDayStart);
+				return lateDate;
 		}
 		lateDate = getEffectiveWorkCalendar().add(t, getLeadValue(), cannotFinishAtDayStart);
 		return lateDate;
