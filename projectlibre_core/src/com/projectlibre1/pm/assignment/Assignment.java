@@ -367,6 +367,11 @@ public final class Assignment implements Schedule, Association, Allocation, Dela
 		return detail.getFillerDuration();
 	}
 
+	/** Profile offset of the stop date: the completed working time plus the split gaps before it. */
+	public long getActualSpanMillis() {
+		return detail.getActualSpan();
+	}
+
 	/** Date reached when the given fraction of the working time is done, skipping split gaps. */
 	public long getStopForPercentComplete(double percentComplete) {
 		long working = DateTime.closestDate(detail.getWorkingDuration() * percentComplete);
@@ -682,8 +687,10 @@ public final class Assignment implements Schedule, Association, Allocation, Dela
 
 
 	boolean isInRange(long start, long finish) {
-		long s = getStart();
-		return (finish > s && start < getEffectiveWorkCalendar().add(s,detail.getDuration(),true));
+		// Up to the real end, not start + duration: when a predecessor holds back the remaining work
+		// of a started assignment, the gap is not part of the duration, and the work after the gap
+		// was reported as zero in every time-phased value (usage, histogram, earned value).
+		return (finish > getStart() && start < getEnd());
 	}
 
 	/**

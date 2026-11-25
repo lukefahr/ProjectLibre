@@ -71,7 +71,7 @@ public class ContourBucketIntervalGenerator implements IntervalGenerator {
 	long start = 0;
 	long end;
 	long assignmentDuration;
-	long assignmentActualDuration=0;
+	long assignmentActualSpan=0; // completed part of the profile, measured like the buckets: gaps included
 	private AbstractContourBucket[] contourBuckets = null;
 	WorkCalendar workCalendar;
 	long splitAtDuration = Long.MAX_VALUE;
@@ -88,7 +88,7 @@ public class ContourBucketIntervalGenerator implements IntervalGenerator {
 		contourBuckets = assignment.getContour(type);
 
 		assignmentDuration = assignment.getDurationMillis();
-		assignmentActualDuration = assignment.getActualDuration();
+		assignmentActualSpan = assignment.getActualSpanMillis(); // not the actual duration: that leaves out gaps before the stop, and the split then landed that much too early
 		long assignmentStart = assignment.getStart();
 		end = assignmentStart; // treat 0th bucket as all time before contour begins
 		
@@ -99,9 +99,9 @@ public class ContourBucketIntervalGenerator implements IntervalGenerator {
 		if (assignment.getDependencyStart() > assignmentStart && assignment.getPercentComplete() > 0.0D) { // if a split caused by remaining work being pushed out by a dependency
 			durationLeftUntilRemainingStartDependency = workCalendar.compare(assignment.getDependencyStart(),assignmentStart,false);
 			if (durationLeftUntilRemainingStartDependency > 0) {
-				if (durationLeftUntilRemainingStartDependency > assignmentActualDuration) {
-					splitAtDuration = assignmentActualDuration;
-					splitDuration = durationLeftUntilRemainingStartDependency - assignmentActualDuration;
+				if (durationLeftUntilRemainingStartDependency > assignmentActualSpan) {
+					splitAtDuration = assignmentActualSpan;
+					splitDuration = durationLeftUntilRemainingStartDependency - assignmentActualSpan;
 				}
 			}
 		}
