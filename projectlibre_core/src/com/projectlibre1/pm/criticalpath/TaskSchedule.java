@@ -67,6 +67,7 @@ import org.apache.commons.lang.builder.ToStringBuilder;
 import com.projectlibre1.datatype.Duration;
 import com.projectlibre1.grouping.core.Node;
 import com.projectlibre1.pm.dependency.Dependency;
+import com.projectlibre1.pm.dependency.DependencyType;
 import com.projectlibre1.pm.dependency.HasDependencies;
 import com.projectlibre1.pm.task.NormalTask;
 import com.projectlibre1.pm.task.Project;
@@ -594,6 +595,31 @@ public final class TaskSchedule implements Cloneable {
  * Calculate the date which predecessors(successors) push this task to start by looping thru all of its predecesors(succ) and choosing the max value
  * @return max date
  */
+	/**
+	 * A finish-to-finish or start-to-finish link gives this task's start by counting the task's own
+	 * duration back from the predecessor (in a backward pass, start-to-start and start-to-finish do the
+	 * same from the successor). That date is worked out when the other task is calculated, so after a
+	 * change to this task's duration it still reflects the old one: the task stayed where its old
+	 * duration put it and only moved to honor the link when the file was next opened. Works those dates
+	 * out again from the other task's schedule as it stands.
+	 */
+	final void refreshLinkDatesCountingOwnDuration() {
+		boolean hasDuration = !task.isWbsParent() && task.hasDuration();
+		for (Iterator i = task.getDependencyList(forward).iterator(); i.hasNext();) {
+			Dependency dependency = (Dependency) i.next();
+			int linkType = dependency.getDependencyType();
+			boolean countsDuration = linkType == DependencyType.SF || linkType == (forward ? DependencyType.FF : DependencyType.SS);
+			if (!countsDuration || dependency.isDisabled() || yieldsToSuccessor(dependency))
+				continue;
+			Task otherTask = (Task) dependency.getTask(forward);
+			if (otherTask.isReverseScheduled())
+				continue; // its dates come from the opposite pass; leave the link for that pass to set
+			TaskSchedule other = otherTask.getSchedule(type);
+			if (other.getBegin() != 0 && other.getEnd() != 0) // it has been calculated
+				dependency.calcDependencyDate(forward,other.getBegin(),other.getEnd(),hasDuration);
+		}
+	}
+
 	long calcDependencyDate() {
 		long result = 0;
 		Dependency dependency;

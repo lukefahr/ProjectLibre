@@ -379,6 +379,16 @@ public class CriticalPath implements SchedulingAlgorithm {
 	
 	
 	/**
+	 * Recalculates after a change to a task (null for the whole project). The change may be to the
+	 * task's duration, so the links that count that duration are brought up to date first.
+	 */
+	private void calculateAfterChangeTo(Task task) {
+		if (task != null)
+			task.getSchedule(isForward() ? TaskSchedule.EARLY : TaskSchedule.LATE).refreshLinkDatesCountingOwnDuration();
+		calculate(true,task);
+	}
+
+	/**
 	 * Respond to object create/delete events
 	 */
 	public void objectChanged(ObjectEvent objectEvent) {
@@ -410,7 +420,7 @@ public class CriticalPath implements SchedulingAlgorithm {
 					task.markTaskAsNeedingRecalculation();
 				}
 			}
-			calculate(true,task);
+			calculateAfterChangeTo(task);
 
 		} else if (changedObject instanceof Dependency) { // dependency added or
 														  // removed
@@ -451,7 +461,7 @@ public class CriticalPath implements SchedulingAlgorithm {
 			if (task.getProject().getSchedulingAlgorithm() != this)
 				return;
 //			if (((NormalTask)task).isEffortDriven())
-			calculate(true,task);
+			calculateAfterChangeTo(task);
 		} else if (changedObject instanceof BelongsToDocument){ // for other things, such as assignment entry
 			if (((BelongsToDocument)changedObject).getDocument() instanceof Project) {
 				Project proj = (Project)((BelongsToDocument)changedObject).getDocument();
