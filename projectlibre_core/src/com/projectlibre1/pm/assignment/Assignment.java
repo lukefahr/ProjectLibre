@@ -372,6 +372,11 @@ public final class Assignment implements Schedule, Association, Allocation, Dela
 		return detail.getActualSpan();
 	}
 
+	/** The end without the wait that a predecessor puts between the completed and the remaining work. */
+	public long getEndWithoutSplit() {
+		return detail.getEndWithoutSplit();
+	}
+
 	/** Date reached when the given fraction of the working time is done, skipping split gaps. */
 	public long getStopForPercentComplete(double percentComplete) {
 		long working = DateTime.closestDate(detail.getWorkingDuration() * percentComplete);

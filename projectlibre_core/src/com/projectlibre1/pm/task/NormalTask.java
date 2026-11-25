@@ -258,18 +258,42 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 			} else {
 				Iterator i = assignments.iterator();
 				duration = 0;
-				// the latest ending assignment decides, measured from the task start and without its split gaps
-				while (i.hasNext()) {
-					Assignment assignment = (Assignment)i.next();
-					long d = getEffectiveWorkCalendar().compare(assignment.getEnd(),getStart(),false) - assignment.getFillerDuration();
-					duration = Math.max(duration, d);
-				}
+				// the latest ending assignment decides
+				while (i.hasNext())
+					duration = Math.max(duration, durationUpTo((Assignment)i.next()));
 			}
 		}
 		duration = Duration.setAsEstimated(duration,estimated);
 		return duration;
 
 //		return calcActiveAssignmentDuration(getEffectiveWorkCalendar());
+	}
+
+	/**
+	 * The duration an assignment gives the task: from the task start to where the assignment's work ends,
+	 * without its split gaps and without the wait a predecessor puts before its remaining work. That wait
+	 * moves whenever the predecessor does, and like any other gap it is not duration.
+	 */
+	private long durationUpTo(Assignment assignment) {
+		return getEffectiveWorkCalendar().compare(assignment.getEndWithoutSplit(),getStart(),false) - assignment.getFillerDuration();
+	}
+
+	/** Changes the assignment's remaining duration so that, as far as this assignment goes, the task has the given duration. */
+	private void endAtTaskDuration(Assignment assignment, long taskDuration) {
+		WorkCalendar taskCalendar = getEffectiveWorkCalendar();
+		WorkCalendar assignmentCalendar = assignment.getEffectiveWorkCalendar();
+		for (int attempt = 0; attempt < 4; attempt++) { // more than once only when shortening takes a gap out of the profile
+			long difference = taskDuration - durationUpTo(assignment);
+			if (difference == 0)
+				break;
+			long end = assignment.getEndWithoutSplit();
+			long change = assignmentCalendar.compare(taskCalendar.add(end,difference,true),end,false); // the same move on the assignment's own calendar
+			long remaining = assignment.getWorkingDurationMillis() - assignment.getActualDuration(); // not getRemainingDuration(), which is rounded to the second
+			long newRemaining = Math.max(0,remaining + change);
+			if (newRemaining == remaining)
+				break; // it is complete up to there already, or its calendar has no working time in between
+			assignment.adjustRemainingDuration(newRemaining,false);
+		}
 	}
 
 	/** Quickly check to see if a task has a duration without actually calculating it
@@ -1015,10 +1039,27 @@ public class NormalTask extends Task implements Allocation, TaskSpecificFields,
 //hk		long newRemainingDuration = Duration.millis(newDuration) - getActualDuration(); // assignments dont treqt
 		long newRemainingDuration = Duration.millis(newDuration); // - getActualDuration(); // assignments dont treqt
 													// units
-		Iterator i = getAssignments().iterator();
-		while (i.hasNext())
-			((Assignment) i.next()).adjustRemainingDurationIfWorkingAtTaskEnd(newRemainingDuration);
-
+		AssociationList assignments = getAssignments();
+		if (assignments.size() < 2 || newRemainingDuration == 0 || isWbsParent() || !isInitialized()) {
+			Iterator i = assignments.iterator();
+			while (i.hasNext())
+				((Assignment) i.next()).adjustRemainingDurationIfWorkingAtTaskEnd(newRemainingDuration);
+			return;
+		}
+		// Several assignments can start at different times and be at different stages, so the task's
+		// remaining duration is not theirs: handing it to each one left the task longer or shorter than
+		// asked. Move the end of those working at the task end, by date or by duration, and of any that
+		// would now outlast the task, to where the task has the duration asked for.
+		long oldTaskDuration = getDurationMillis();
+		long taskDuration = Duration.millis(getActualDuration()) + newRemainingDuration;
+		long taskEnd = getEnd();
+		Iterator i = assignments.iterator();
+		while (i.hasNext()) {
+			Assignment assignment = (Assignment) i.next();
+			long upTo = durationUpTo(assignment);
+			if (assignment.getEnd() >= taskEnd || upTo >= oldTaskDuration || upTo > taskDuration)
+				endAtTaskDuration(assignment,taskDuration);
+		}
 	}
 
 	/**

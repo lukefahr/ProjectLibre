@@ -377,6 +377,7 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
 			newRemainingDuration = 0; // just in case
 		if (getUnits() == 0) // take care of degenerate case
 			newRemainingDuration = 0;
+		long stop = getStop(); // read before the profile changes: afterwards it would be worked out from the new length
 		long actualDuration = getActualDuration(); // working time done
 		long actualSpan = getActualSpan();
 		if (actualDuration > 0 && !workContour.isPersonal()) // because the remaining might not have same contour
@@ -394,7 +395,7 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
 				break;
 			d += shortfall; // a gap was cut away with the end: put the working time back
 		}
-		setDuration(d);
+		setDuration(d, stop);
 	}
 
 	/**
@@ -810,7 +811,11 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
  	
  	
     public void setDuration(long duration) {
-    	long stop = getStop(); // need to preserve completion
+    	setDuration(duration, getStop()); // need to preserve completion
+    }
+
+    /** Sets the duration and leaves the completed part ending at the given stop date. */
+    private void setDuration(long duration, long stop) {
     	if (Duration.millis(duration) < 0)
     		duration = 0; // just in case
     	this.duration = duration;
@@ -831,9 +836,14 @@ public final class AssignmentDetail implements Schedule, HasCalendar, Cloneable,
 		setPercentComplete(1.0D);
 	}    
  	
+	/** Where the work would end if the remaining part followed the completed part directly. */
+	long getEndWithoutSplit() {
+		return getEffectiveWorkCalendar().add(getStart(),getDuration(),true);
+	}
+
 	public long getEnd() {
 		WorkCalendar cal = getEffectiveWorkCalendar();
-		long finish = cal.add(getStart(),getDuration(),true);
+		long finish = getEndWithoutSplit();
 		if (getPercentComplete() > 0.0 && getPercentComplete() < 1.0) {
 			// the gap runs from where the completed work stops to where the predecessors let the
 			// remaining work resume, not from the task start (that counted the completed work twice)
